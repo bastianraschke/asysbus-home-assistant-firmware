@@ -15,7 +15,7 @@ void setup()
 {
     Serial.begin(115200);
 
-    char buffer[64];
+    const char buffer[64];
     sprintf(buffer, "The node '0x%04X' was powered up.", NODE_CAN_ADDRESS);
     Serial.println(buffer);
 
