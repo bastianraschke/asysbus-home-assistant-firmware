@@ -20,7 +20,7 @@ void setup()
     Serial.println(buffer);
 
     setupCan();
-    setupUART();
+    setupUart();
 }
 
 void setupCan()
@@ -42,7 +42,7 @@ void setupCan()
     }
 }
 
-void setupUART()
+void setupUart()
 {
     Serial.println(F("Attaching UART..."));
 
