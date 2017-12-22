@@ -8,7 +8,8 @@
 #define PIN_CAN_INT                             2
 
 #define PIN_SWITCH                              3
-#define PIN_SWITCH_LED                          8
+#define PIN_VIBRATION_MOTOR                     4
+#define PIN_LED                                 5
 
 ASB asb0(NODE_CAN_ADDRESS);
 ASB_CAN asbCan0(PIN_CAN_CS, CAN_125KBPS, MCP_8MHz, PIN_CAN_INT);
@@ -25,7 +26,8 @@ void setup()
 
     setupCan();
     setupSwitch();
-    setupSwitchLed();
+    setupLed();
+    setupVibrationMotor();
 }
 
 void setupCan()
@@ -53,19 +55,31 @@ void setupSwitch()
     digitalWrite(PIN_SWITCH, HIGH);
 }
 
-void setupSwitchLed()
+void setupLed()
 {
-    pinMode(PIN_SWITCH_LED, OUTPUT);
+    pinMode(PIN_LED, OUTPUT);
 
     // LED test
     showLed(500);
 }
 
+void setupVibrationMotor()
+{
+    pinMode(PIN_VIBRATION_MOTOR, OUTPUT);
+}
+
 void showLed(const int delayTime)
 {
-    digitalWrite(PIN_SWITCH_LED, HIGH);
+    digitalWrite(PIN_LED, HIGH);
     delay(delayTime);
-    digitalWrite(PIN_SWITCH_LED, LOW);
+    digitalWrite(PIN_LED, LOW);
+}
+
+void vibrateMotor(const int delayTime)
+{
+    digitalWrite(PIN_VIBRATION_MOTOR, HIGH);
+    delay(delayTime);
+    digitalWrite(PIN_VIBRATION_MOTOR, LOW);
 }
 
 void loop()
@@ -86,6 +100,7 @@ void loop()
         {
             Serial.println(F("Message send OK!"));
             showLed(100);
+            vibrateMotor(100);
         }
     }
 
