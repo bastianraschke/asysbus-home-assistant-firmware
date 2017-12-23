@@ -7,11 +7,10 @@
 #define PIN_CAN_CS                              10
 #define PIN_CAN_INT                             2
 
-#define PIN_BUTTON_LIGHT                        3
-
 #define PIN_LED_RED                             14
 #define PIN_LED_GREEN                           13
 #define PIN_LED_BLUE                            12
+#define PIN_LED_WHITE                           0
 
 #define CROSSFADE_ENABLED                       true
 #define CROSSFADE_DELAY                         2
@@ -43,22 +42,22 @@ void setup()
     sprintf(buffer, "The node '0x%04X' was powered up.", NODE_CAN_ADDRESS);
     Serial.println(buffer);
 
-    setupCan();
+    setupCanBus();
     setupToggleSwitch();
 }
 
-void setupCan()
+void setupCanBus()
 {
     Serial.println(F("Attaching CAN..."));
 
- char busId = asb0.busAttach(&asbCan0);
+    const char busId = asb0.busAttach(&asbCan0);
 
     if (busId != -1)
     {
         Serial.println(F("Attaching CAN was successful."));
 
-     byte bootPacketData[1] = {ASB_CMD_BOOT};
-     byte bootPackedStats = asb0.asbSend(ASB_PKGTYPE_BROADCAST, 0xFFFF, sizeof(bootPacketData), bootPacketData);
+        const byte bootPacketData[1] = {ASB_CMD_BOOT};
+        byte bootPackedStats = asb0.asbSend(ASB_PKGTYPE_BROADCAST, 0xFFFF, sizeof(bootPacketData), bootPacketData);
     }
     else
     {
@@ -92,14 +91,10 @@ void setupLEDStrip()
     showGivenColor(defaultOnColor);
 }
 
-void setupToggleSwitch()
-{
-    pinMode(PIN_BUTTON_LIGHT, INPUT_PULLUP);
-    //digitalWrite(PIN_BUTTON_LIGHT, HIGH);
-}
-
 void onLightSwitched( asbPacket &canPacket)
 {
+    // TODO: add check if setup is done
+
     Serial.print(F("Light was switched "));
 
     if (canPacket.data[1] == 1)
@@ -114,8 +109,15 @@ void onLightSwitched( asbPacket &canPacket)
     }
 }
 
+void onBrightnessChanged( asbPacket &canPacket)
+{
+
+}
+
 void onColorChanged( asbPacket &canPacket)
 {
+    // TODO: add check if setup is done
+
     Serial.print(F("Color was switched "));
 
     const uint32_t rColor = canPacket.data[1];
@@ -216,44 +218,7 @@ void showGivenColorImmediately(const uint32_t color)
     analogWrite(PIN_LED_BLUE, mappedBlue);
 }
 
-void loop() {
-    const asbPacket canPacket = asb0.loop();
-
-    if (canPacket.meta.busId != -1) {
-        Serial.println(F("---"));
-        Serial.print(F("Type: 0x"));
-        Serial.println(canPacket.meta.type, HEX);
-        Serial.print(F("Target: 0x"));
-        Serial.println(canPacket.meta.target, HEX);
-        Serial.print(F("Source: 0x"));
-        Serial.println(canPacket.meta.source, HEX);
-        Serial.print(F("Port: 0x"));
-        Serial.println(canPacket.meta.port, HEX);
-        Serial.print(F("Length: 0x"));
-        Serial.println(canPacket.len, HEX);
-
-        for(byte i=0; i<canPacket.len; i++) {
-            Serial.print(F(" 0x"));
-            Serial.print(canPacket.data[i], HEX);
-        }
-        
-        Serial.println();
-    }
-
-    const bool newButtonState = digitalRead(PIN_BUTTON_LIGHT);
-
-    if (oldButtonState != newButtonState && newButtonState == LOW)
-    {
-         byte lightSwitchedPacketData[2] = {ASB_CMD_1B, 1};
-         byte lightSwitchedPacketStats = asb0.asbSend(ASB_PKGTYPE_MULTICAST, 0x1234, sizeof(lightSwitchedPacketData), lightSwitchedPacketData);
-        
-        if (lightSwitchedPacketStats != CAN_OK)
-        {
-            Serial.println(F("Message could not be sent successfully!"));
-        } else{
-            Serial.println(F("Message send OK!"));
-        }
-    }
-
-    oldButtonState = newButtonState;
+void loop()
+{
+    asb0.loop();
 }
