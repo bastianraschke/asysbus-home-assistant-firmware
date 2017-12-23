@@ -14,7 +14,7 @@
 ASB asb0(NODE_CAN_ADDRESS);
 ASB_CAN asbCan0(PIN_CAN_CS, CAN_125KBPS, MCP_8MHz, PIN_CAN_INT);
 
-int oldSwitchState = HIGH;
+int oldSwitchState = LOW;
 
 void setup()
 {
@@ -24,13 +24,13 @@ void setup()
     sprintf(buffer, "The node '0x%04X' was powered up.", NODE_CAN_ADDRESS);
     Serial.println(buffer);
 
-    setupCan();
+    setupCanBus();
     setupSwitch();
     setupLed();
     setupVibrationMotor();
 }
 
-void setupCan()
+void setupCanBus()
 {
     Serial.println(F("Attaching CAN..."));
 
@@ -58,9 +58,6 @@ void setupSwitch()
 void setupLed()
 {
     pinMode(PIN_LED, OUTPUT);
-
-    // LED test
-    showLed(500);
 }
 
 void setupVibrationMotor()
@@ -68,39 +65,73 @@ void setupVibrationMotor()
     pinMode(PIN_VIBRATION_MOTOR, OUTPUT);
 }
 
-void showLed(const int delayTime)
+void showLedWithVibrationFeedback(const int delayTimeInMilliseconds)
 {
     digitalWrite(PIN_LED, HIGH);
-    delay(delayTime);
+    digitalWrite(PIN_VIBRATION_MOTOR, HIGH);
+    delay(delayTimeInMilliseconds);
     digitalWrite(PIN_LED, LOW);
+    digitalWrite(PIN_VIBRATION_MOTOR, LOW);
 }
 
-void vibrateMotor(const int delayTime)
+void pulseLedWithVibrationFeedback(const int delayTimeInMilliseconds, const int repeatCount)
 {
-    digitalWrite(PIN_VIBRATION_MOTOR, HIGH);
-    delay(delayTime);
-    digitalWrite(PIN_VIBRATION_MOTOR, LOW);
+    // Avoid devision by zero
+    if (delayTimeInMilliseconds > 0)
+    {
+        for (int t = 0; t < repeatCount; t++)
+        {
+            // Be sure, the LED is off before we start
+            digitalWrite(PIN_LED, LOW);
+
+            digitalWrite(PIN_VIBRATION_MOTOR, HIGH);
+
+            const int stepDelayTimeInMicroseconds = (int) (((float) delayTimeInMilliseconds * 1000.0f) / 2.0f / 256.0f);
+
+            for (int i = 0; i < 256; i++)
+            {
+                analogWrite(PIN_LED, i);
+                delayMicroseconds(stepDelayTimeInMicroseconds);
+            }
+
+            for (int i = 256; i >= 0; i--)
+            {
+                analogWrite(PIN_LED, i);
+                delayMicroseconds(stepDelayTimeInMicroseconds);
+            }
+
+            digitalWrite(PIN_VIBRATION_MOTOR, LOW);
+
+            if (repeatCount > 1)
+            {
+                const int repeatDelayTimeInMicroseconds = (int) (((float) delayTimeInMilliseconds * 1000.0f) * 2.0f);
+                delayMicroseconds(repeatDelayTimeInMicroseconds);
+                Serial.println(repeatDelayTimeInMicroseconds);
+            }
+        }
+    }
 }
 
 void loop()
 {
-    const asbPacket canPacket = asb0.loop();
+    asb0.loop();
+
     const bool newSwitchState = digitalRead(PIN_SWITCH);
 
     if (oldSwitchState != newSwitchState && newSwitchState == LOW)
     {
         const byte switchPressedPacketData[2] = {ASB_CMD_1B, 1};
         byte lightSwitchedPacketStats = asb0.asbSend(ASB_PKGTYPE_MULTICAST, 0x1234, sizeof(switchPressedPacketData), switchPressedPacketData);
-        
+
         if (lightSwitchedPacketStats != CAN_OK)
         {
             Serial.println(F("Message could not be sent successfully!"));
+            pulseLedWithVibrationFeedback(100, 3);
         }
         else
         {
             Serial.println(F("Message send OK!"));
-            showLed(100);
-            vibrateMotor(100);
+            pulseLedWithVibrationFeedback(200, 1);
         }
     }
 
