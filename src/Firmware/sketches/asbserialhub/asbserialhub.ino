@@ -34,7 +34,12 @@ void setupCanBus()
         Serial.println(F("Attaching CAN was successful."));
 
         const byte bootPacketData[1] = {ASB_CMD_BOOT};
-        byte bootPackedStats = asb0.asbSend(ASB_PKGTYPE_BROADCAST, 0xFFFF, sizeof(bootPacketData), bootPacketData);
+        const byte bootPacketStats = asb0.asbSend(ASB_PKGTYPE_BROADCAST, 0xFFFF, sizeof(bootPacketData), bootPacketData);
+
+        if (bootPacketStats != CAN_OK)
+        {
+            Serial.println(F("The boot complete message could not be sent successfully!"));
+        }
     }
     else
     {

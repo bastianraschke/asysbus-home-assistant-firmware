@@ -41,7 +41,12 @@ void setupCanBus()
         Serial.println(F("Attaching CAN was successful."));
 
         const byte bootPacketData[1] = {ASB_CMD_BOOT};
-        byte bootPackedStats = asb0.asbSend(ASB_PKGTYPE_BROADCAST, 0xFFFF, sizeof(bootPacketData), bootPacketData);
+        const byte bootPacketStats = asb0.asbSend(ASB_PKGTYPE_BROADCAST, 0xFFFF, sizeof(bootPacketData), bootPacketData);
+
+        if (bootPacketStats != CAN_OK)
+        {
+            Serial.println(F("The boot complete message could not be sent successfully!"));
+        }
     }
     else
     {
@@ -51,8 +56,8 @@ void setupCanBus()
 
 void setupSwitch()
 {
-    pinMode(PIN_SWITCH, INPUT_PULLUP);
-    digitalWrite(PIN_SWITCH, HIGH);
+    // Because a capacitive switch module with internal pulldown is used, we need no pullup/down
+    pinMode(PIN_SWITCH, INPUT);
 }
 
 void setupLed()
@@ -118,12 +123,13 @@ void loop()
 
     const bool newSwitchState = digitalRead(PIN_SWITCH);
 
-    if (oldSwitchState != newSwitchState && newSwitchState == LOW)
+    if (oldSwitchState != newSwitchState && newSwitchState == HIGH)
     {
+        const unsigned int targetAdress = 0x0001;
         const byte switchPressedPacketData[2] = {ASB_CMD_1B, 1};
-        byte lightSwitchedPacketStats = asb0.asbSend(ASB_PKGTYPE_MULTICAST, 0x1234, sizeof(switchPressedPacketData), switchPressedPacketData);
+        const byte switchPressedPacketStats = asb0.asbSend(ASB_PKGTYPE_MULTICAST, targetAdress, sizeof(switchPressedPacketData), switchPressedPacketData);
 
-        if (lightSwitchedPacketStats != CAN_OK)
+        if (switchPressedPacketStats != CAN_OK)
         {
             Serial.println(F("Message could not be sent successfully!"));
             pulseLedWithVibrationFeedback(100, 3);
