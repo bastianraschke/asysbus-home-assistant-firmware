@@ -19,11 +19,11 @@ void setup()
     sprintf(buffer, "The node '0x%04X' was powered up.", NODE_CAN_ADDRESS);
     Serial.println(buffer);
 
-    setupCan();
+    setupCanBus();
     setupUart();
 }
 
-void setupCan()
+void setupCanBus()
 {
     Serial.println(F("Attaching CAN..."));
 
