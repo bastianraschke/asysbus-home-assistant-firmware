@@ -7,14 +7,14 @@
 #define PIN_CAN_CS                              10
 #define PIN_CAN_INT                             2
 
-#define PIN_SWITCH                              3
+#define PIN_BUTTON                              3
 #define PIN_VIBRATION_MOTOR                     4
 #define PIN_LED                                 5
 
 ASB asb0(NODE_CAN_ADDRESS);
 ASB_CAN asbCan0(PIN_CAN_CS, CAN_125KBPS, MCP_8MHz, PIN_CAN_INT);
 
-int oldSwitchState = LOW;
+int oldButtonState = LOW;
 
 void setup()
 {
@@ -25,7 +25,7 @@ void setup()
     Serial.println(buffer);
 
     setupCanBus();
-    setupSwitch();
+    setupButton();
     setupLed();
     setupVibrationMotor();
 }
@@ -54,10 +54,10 @@ void setupCanBus()
     }
 }
 
-void setupSwitch()
+void setupButton()
 {
     // Because a capacitive switch module with internal pulldown is used, we need no pullup/down
-    pinMode(PIN_SWITCH, INPUT);
+    pinMode(PIN_BUTTON, INPUT);
 }
 
 void setupLed()
@@ -70,20 +70,13 @@ void setupVibrationMotor()
     pinMode(PIN_VIBRATION_MOTOR, OUTPUT);
 }
 
-void showLedWithVibrationFeedback(const int delayTimeInMilliseconds)
-{
-    digitalWrite(PIN_LED, HIGH);
-    digitalWrite(PIN_VIBRATION_MOTOR, HIGH);
-    delay(delayTimeInMilliseconds);
-    digitalWrite(PIN_LED, LOW);
-    digitalWrite(PIN_VIBRATION_MOTOR, LOW);
-}
-
 void pulseLedWithVibrationFeedback(const int delayTimeInMilliseconds, const int repeatCount)
 {
     // Avoid devision by zero
     if (delayTimeInMilliseconds > 0)
     {
+        const int stepDelayTimeInMicroseconds = (int) (((float) delayTimeInMilliseconds * 1000.0f) / 2.0f / 256.0f);
+
         for (int t = 0; t < repeatCount; t++)
         {
             // Be sure, the LED is off before we start
@@ -91,14 +84,14 @@ void pulseLedWithVibrationFeedback(const int delayTimeInMilliseconds, const int 
 
             digitalWrite(PIN_VIBRATION_MOTOR, HIGH);
 
-            const int stepDelayTimeInMicroseconds = (int) (((float) delayTimeInMilliseconds * 1000.0f) / 2.0f / 256.0f);
-
+            // Fade in the LED
             for (int i = 0; i < 256; i++)
             {
                 analogWrite(PIN_LED, i);
                 delayMicroseconds(stepDelayTimeInMicroseconds);
             }
 
+            // Fade out the LED
             for (int i = 256; i >= 0; i--)
             {
                 analogWrite(PIN_LED, i);
@@ -107,11 +100,11 @@ void pulseLedWithVibrationFeedback(const int delayTimeInMilliseconds, const int 
 
             digitalWrite(PIN_VIBRATION_MOTOR, LOW);
 
-            if (repeatCount > 1)
+            // A delay between cycles is only needed if the cycle is repeated more than once and also not after the last cycle
+            if (repeatCount > 1 && t != repeatCount - 1)
             {
                 const int repeatDelayTimeInMicroseconds = (int) (((float) delayTimeInMilliseconds * 1000.0f) * 2.0f);
                 delayMicroseconds(repeatDelayTimeInMicroseconds);
-                Serial.println(repeatDelayTimeInMicroseconds);
             }
         }
     }
@@ -121,9 +114,9 @@ void loop()
 {
     asb0.loop();
 
-    const bool newSwitchState = digitalRead(PIN_SWITCH);
+    const bool newButtonState = digitalRead(PIN_BUTTON);
 
-    if (oldSwitchState != newSwitchState && newSwitchState == HIGH)
+    if (oldButtonState != newButtonState && newButtonState == HIGH)
     {
         const unsigned int targetAdress = 0x0001;
         const byte switchPressedPacketData[2] = {ASB_CMD_1B, 1};
@@ -141,5 +134,5 @@ void loop()
         }
     }
 
-    oldSwitchState = newSwitchState;
+    oldButtonState = newButtonState;
 }
