@@ -2,7 +2,7 @@
 
 #define FIRMWARE_VERSION                        "1.0.0"
 
-#define NODE_CAN_ADDRESS                        0x0002
+#define NODE_CAN_ADDRESS                        0x000B
 
 #define PIN_CAN_CS                              10
 #define PIN_CAN_INT                             2
@@ -17,7 +17,7 @@
 #define CROSSFADE_STEPCOUNT                     255
 
 ASB asb0(NODE_CAN_ADDRESS);
-ASB_CAN asbCan0(PIN_CAN_CS, CAN_125KBPS, MCP_8MHZ, PIN_CAN_INT);
+ASB_CAN asbCan0(PIN_CAN_CS, CAN_125KBPS, MCP_8MHz, PIN_CAN_INT);
 
 const uint32_t defaultOnColor = 0xFFFFFF;
 const uint32_t defaultOffColor = 0x000000;
@@ -43,7 +43,6 @@ void setup()
     Serial.println(buffer);
 
     setupCanBus();
-    setupToggleSwitch();
 }
 
 void setupCanBus()
