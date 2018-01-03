@@ -2,7 +2,7 @@
 
 #define FIRMWARE_VERSION                        "1.0.0"
 
-#define NODE_CAN_ADDRESS                        0x000B
+#define NODE_CAN_ADDRESS                        0x03E8
 
 #define PIN_CAN_CS                              10
 #define PIN_CAN_INT                             2
@@ -40,7 +40,8 @@ void setupLEDs()
 {
     Serial.println("Setup LEDs...");
 
-    // TODO: show last state
+    // TODO: show last state instead
+    showGivenColor(255, 255, 255, 255);
 }
 
 void setupCanBus()
@@ -128,16 +129,26 @@ void loop()
 {
     //asb0.loop();
 
-    showGivenColor(50, 0, 0, 255);
-    delay(5000);
+    const asbPacket canPacket = asb0.loop();
 
-    showGivenColor(0, 50, 0, 255);
-    delay(5000);
+    if (canPacket.meta.busId != -1) {
+        Serial.println(F("---"));
+        Serial.print(F("Type: 0x"));
+        Serial.println(canPacket.meta.type, HEX);
+        Serial.print(F("Target: 0x"));
+        Serial.println(canPacket.meta.target, HEX);
+        Serial.print(F("Source: 0x"));
+        Serial.println(canPacket.meta.source, HEX);
+        Serial.print(F("Port: 0x"));
+        Serial.println(canPacket.meta.port, HEX);
+        Serial.print(F("Length: 0x"));
+        Serial.println(canPacket.len, HEX);
 
-    showGivenColor(0, 0, 50, 255);
-    delay(5000);
-
-    showGivenColor(255, 100, 50, 255);
-    delay(5000);
-
+        for(byte i=0; i<canPacket.len; i++) {
+            Serial.print(F(" 0x"));
+            Serial.print(canPacket.data[i], HEX);
+        }
+        
+        Serial.println();
+    }
 }

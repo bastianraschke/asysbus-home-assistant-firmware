@@ -2,7 +2,7 @@
 
 #define FIRMWARE_VERSION                        "1.0.0"
 
-#define NODE_CAN_ADDRESS                        0x000A
+#define NODE_CAN_ADDRESS                        0x07D0
 
 #define PIN_CAN_CS                              10
 #define PIN_CAN_INT                             2
