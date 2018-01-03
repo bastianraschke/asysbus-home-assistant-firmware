@@ -17,8 +17,6 @@
 ASB asb0(NODE_CAN_ADDRESS);
 ASB_CAN asbCan0(PIN_CAN_CS, CAN_125KBPS, MCP_8MHz, PIN_CAN_INT);
 
-bool stateOn = true;
-
 enum LEDType {
     RGB,
     RGBW
@@ -54,14 +52,6 @@ void setupCanBus()
     {
         Serial.println(F("Attaching CAN was successful."));
 
-        const byte bootPacketData[1] = {ASB_CMD_BOOT};
-        const byte bootPacketStats = asb0.asbSend(ASB_PKGTYPE_BROADCAST, 0xFFFF, sizeof(bootPacketData), bootPacketData);
-
-        if (bootPacketStats != CAN_OK)
-        {
-            Serial.println(F("The boot complete message could not be sent successfully!"));
-        }
-
         Serial.println(F("Attaching light state changed hook..."));
 
         const uint8_t hookOnPacketType = ASB_PKGTYPE_MULTICAST;
@@ -83,6 +73,24 @@ void setupCanBus()
 void onLightChangedPacketReceived(const asbPacket &canPacket)
 {
     // TODO: Extract bytes from asbPacket
+
+    /*
+    Serial.print(F("Type: 0x"));
+    Serial.println(canPacket.meta.type, HEX);
+    Serial.print(F("Target: 0x"));
+    Serial.println(canPacket.meta.target, HEX);
+    Serial.print(F("Source: 0x"));
+    Serial.println(canPacket.meta.source, HEX);
+    Serial.print(F("Port: 0x"));
+    Serial.println(canPacket.meta.port, HEX);
+    Serial.print(F("Length: 0x"));
+    Serial.println(canPacket.len, HEX);
+
+    for(byte i=0; i<canPacket.len; i++) {
+        Serial.print(F(" 0x"));
+        Serial.print(canPacket.data[i], HEX);
+    }
+    */
 
     const uint8_t redValue = constrain(255, 0, 255);
     const uint8_t greenValue = constrain(255, 0, 255);
@@ -106,7 +114,7 @@ void onLightChangedPacketReceived(const asbPacket &canPacket)
 
 void publishLightState()
 {
-    // TODO: Send CAN packet to publish current state
+    // TODO: Send CAN packet to publish current state to hub/brigde
 }
 
 void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
@@ -148,7 +156,11 @@ void loop()
             Serial.print(F(" 0x"));
             Serial.print(canPacket.data[i], HEX);
         }
-        
+
         Serial.println();
+    }
+
+    if (canPacket.meta.busId != -1 && canPacket.data[0] != 0x21) {
+        showGivenColor(255, 0, 0, 0);
     }
 }
