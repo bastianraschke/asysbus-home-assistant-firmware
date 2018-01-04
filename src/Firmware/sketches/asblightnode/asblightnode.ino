@@ -2,7 +2,8 @@
 
 #define FIRMWARE_VERSION                        "1.0.0"
 
-#define NODE_CAN_ADDRESS                        0x03E8
+#define ASB_BRIDGE_NODE_ID                      0x0001
+#define ASB_NODE_ID                             0x03E8
 
 #define PIN_CAN_CS                              10
 #define PIN_CAN_INT                             2
@@ -14,7 +15,7 @@
 #define PIN_LED_BLUE                            6
 #define PIN_LED_WHITE                           9
 
-ASB asb0(NODE_CAN_ADDRESS);
+ASB asb0(ASB_NODE_ID);
 ASB_CAN asbCan0(PIN_CAN_CS, CAN_125KBPS, MCP_8MHz, PIN_CAN_INT);
 
 enum LEDType {
@@ -27,7 +28,7 @@ void setup()
     Serial.begin(115200);
 
     const char buffer[64];
-    sprintf(buffer, "The node '0x%04X' was powered up.", NODE_CAN_ADDRESS);
+    sprintf(buffer, "The node '0x%04X' was powered up.", ASB_NODE_ID);
     Serial.println(buffer);
 
     setupLEDs();
@@ -55,11 +56,15 @@ void setupCanBus()
         Serial.println(F("Attaching light state changed hook..."));
 
         const uint8_t hookOnPacketType = ASB_PKGTYPE_MULTICAST;
-        const uint8_t hookOnTarget = NODE_CAN_ADDRESS;
+        const uint8_t hookOnTarget = ASB_NODE_ID;
         const uint8_t hookOnPort = -1;
         const uint8_t hookOnFirstDataByte = ASB_CMD_1B; // TODO: Change to ASB_CMD_S_RGBW
 
-        if (asb0.hookAttach(hookOnPacketType, hookOnTarget, hookOnPort, hookOnFirstDataByte, onLightChangedPacketReceived) == false)
+        if (asb0.hookAttach(hookOnPacketType, hookOnTarget, hookOnPort, hookOnFirstDataByte, onLightChangedPacketReceived))
+        {
+            Serial.println(F("Attaching light state changed was successful."));
+        }
+        else
         {
             Serial.println(F("Attaching light state changed was not successful!"));
         }
