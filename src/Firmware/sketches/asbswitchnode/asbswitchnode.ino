@@ -2,7 +2,8 @@
 
 #define FIRMWARE_VERSION                        "1.0.0"
 
-#define NODE_CAN_ADDRESS                        0x07D0
+#define ASB_BRIDGE_NODE_ID                      0x0001
+#define ASB_NODE_ID                             0x07D0
 
 #define PIN_CAN_CS                              10
 #define PIN_CAN_INT                             2
@@ -11,23 +12,24 @@
 #define PIN_VIBRATION_MOTOR                     4
 #define PIN_LED                                 5
 
-ASB asb0(NODE_CAN_ADDRESS);
+ASB asb0(ASB_NODE_ID);
 ASB_CAN asbCan0(PIN_CAN_CS, CAN_125KBPS, MCP_8MHz, PIN_CAN_INT);
 
 int oldButtonState = LOW;
+bool internalButtonEnabledState = false;
 
 void setup()
 {
     Serial.begin(115200);
 
     const char buffer[64];
-    sprintf(buffer, "The node '0x%04X' was powered up.", NODE_CAN_ADDRESS);
+    sprintf(buffer, "The node '0x%04X' was powered up.", ASB_NODE_ID);
     Serial.println(buffer);
 
     setupCanBus();
-    setupButton();
     setupLed();
     setupVibrationMotor();
+    setupButton();
 }
 
 void setupCanBus()
@@ -40,7 +42,21 @@ void setupCanBus()
     {
         Serial.println(F("Attaching CAN was successful."));
 
-        // TODO: add hook to switch state
+        Serial.println(F("Attaching switch state changed hook..."));
+
+        const uint8_t hookOnPacketType = ASB_PKGTYPE_MULTICAST;
+        const unsigned int hookOnTarget = ASB_NODE_ID;
+        const uint8_t hookOnPort = -1;
+        const uint8_t hookOnFirstDataByte = ASB_CMD_1B;
+
+        if (asb0.hookAttach(hookOnPacketType, hookOnTarget, hookOnPort, hookOnFirstDataByte, onSwitchChangedPacketReceived))
+        {
+            Serial.println(F("Attaching switch state changed was successful."));
+        }
+        else
+        {
+            Serial.println(F("Attaching switch state changed was not successful!"));
+        }
     }
     else
     {
@@ -48,10 +64,21 @@ void setupCanBus()
     }
 }
 
-void setupButton()
+void onSwitchChangedPacketReceived(const asbPacket &canPacket)
 {
-    // Because a capacitive switch module with internal pulldown is used, we need no pullup/down
-    pinMode(PIN_BUTTON, INPUT);
+    // Check if packet is like expected
+    if (canPacket.len == 2 && (canPacket.data[1] == 0x00 || canPacket.data[1] == 0x01))
+    {
+        pulseLedWithVibrationFeedback(200, 1, false);
+
+        internalButtonEnabledState = (canPacket.data[1] == 0x01);
+        Serial.print("onSwitchChangedPacketReceived(): Switch was switched to ");
+        Serial.println(internalButtonEnabledState);
+    }
+    else
+    {
+        Serial.println("onSwitchChangedPacketReceived(): Invalid packet!");
+    }
 }
 
 void setupLed()
@@ -64,7 +91,13 @@ void setupVibrationMotor()
     pinMode(PIN_VIBRATION_MOTOR, OUTPUT);
 }
 
-void pulseLedWithVibrationFeedback(const int delayTimeInMilliseconds, const int repeatCount)
+void setupButton()
+{
+    // Because a capacitive switch module with internal pulldown is used, we need no pullup/down
+    pinMode(PIN_BUTTON, INPUT);
+}
+
+void pulseLedWithVibrationFeedback(const int delayTimeInMilliseconds, const int repeatCount, const bool vibrateMotor)
 {
     // Avoid devision by zero
     if (delayTimeInMilliseconds > 0)
@@ -76,7 +109,10 @@ void pulseLedWithVibrationFeedback(const int delayTimeInMilliseconds, const int 
             // Be sure, the LED is off before we start
             digitalWrite(PIN_LED, LOW);
 
-            digitalWrite(PIN_VIBRATION_MOTOR, HIGH);
+            if (vibrateMotor)
+            {
+                digitalWrite(PIN_VIBRATION_MOTOR, HIGH);
+            }
 
             // Fade in the LED
             for (int i = 0; i < 256; i++)
@@ -92,7 +128,10 @@ void pulseLedWithVibrationFeedback(const int delayTimeInMilliseconds, const int 
                 delayMicroseconds(stepDelayTimeInMicroseconds);
             }
 
-            digitalWrite(PIN_VIBRATION_MOTOR, LOW);
+            if (vibrateMotor)
+            {
+                digitalWrite(PIN_VIBRATION_MOTOR, LOW);
+            }
 
             // A delay between cycles is only needed if the cycle is repeated more than once and also not after the last cycle
             if (repeatCount > 1 && t != repeatCount - 1)
@@ -112,20 +151,28 @@ void loop()
 
     if (oldButtonState != newButtonState && newButtonState == HIGH)
     {
-        const unsigned int targetAdress = 0x0001;
-        const byte switchPressedPacketData[2] = {ASB_CMD_1B, 1};
+        const unsigned int targetAdress = ASB_BRIDGE_NODE_ID;
+        const byte switchPressedPacketData[2] = {ASB_CMD_1B, internalButtonEnabledState ? 0x01 : 0x00};
         const byte switchPressedPacketStats = asb0.asbSend(ASB_PKGTYPE_MULTICAST, targetAdress, sizeof(switchPressedPacketData), switchPressedPacketData);
+
+        Serial.print("loop(): switchPressedPacketStats = ");
+        Serial.println(switchPressedPacketStats);
+
+        Serial.print("loop(): CAN_OK = ");
+        Serial.println(CAN_OK);
 
         if (switchPressedPacketStats != CAN_OK)
         {
             Serial.println(F("Message could not be sent successfully!"));
-            pulseLedWithVibrationFeedback(100, 3);
+            pulseLedWithVibrationFeedback(100, 3, true);
         }
         else
         {
             Serial.println(F("Message send OK!"));
-            pulseLedWithVibrationFeedback(200, 1);
+            pulseLedWithVibrationFeedback(200, 1, true);
         }
+
+        internalButtonEnabledState = !internalButtonEnabledState;
     }
 
     oldButtonState = newButtonState;
