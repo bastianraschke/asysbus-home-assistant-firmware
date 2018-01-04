@@ -23,7 +23,7 @@ void setup()
     Serial.begin(115200);
 
     const char buffer[64];
-    sprintf(buffer, "The node '0x%04X' was powered up.", ASB_NODE_ID);
+    sprintf(buffer, "setup(): The node '0x%04X' was powered up.", ASB_NODE_ID);
     Serial.println(buffer);
 
     setupCanBus();
@@ -34,33 +34,33 @@ void setup()
 
 void setupCanBus()
 {
-    Serial.println(F("Attaching CAN..."));
+    Serial.println(F("setupCanBus(): Attaching CAN..."));
 
     const char busId = asb0.busAttach(&asbCan0);
 
     if (busId != -1)
     {
-        Serial.println(F("Attaching CAN was successful."));
+        Serial.println(F("setupCanBus(): Attaching CAN was successful."));
 
-        Serial.println(F("Attaching switch state changed hook..."));
+        Serial.println(F("setupCanBus(): Attaching switch state changed hook..."));
 
         const uint8_t hookOnPacketType = ASB_PKGTYPE_MULTICAST;
         const unsigned int hookOnTarget = ASB_NODE_ID;
-        const uint8_t hookOnPort = -1;
+        const uint8_t hookOnPort = 0xFF;
         const uint8_t hookOnFirstDataByte = ASB_CMD_1B;
 
         if (asb0.hookAttach(hookOnPacketType, hookOnTarget, hookOnPort, hookOnFirstDataByte, onSwitchChangedPacketReceived))
         {
-            Serial.println(F("Attaching switch state changed was successful."));
+            Serial.println(F("setupCanBus(): Attaching switch state changed was successful."));
         }
         else
         {
-            Serial.println(F("Attaching switch state changed was not successful!"));
+            Serial.println(F("setupCanBus(): Attaching switch state changed was not successful!"));
         }
     }
     else
     {
-        Serial.println(F("Attaching CAN was not successful!"));
+        Serial.println(F("setupCanBus(): Attaching CAN was not successful!"));
     }
 }
 
@@ -69,15 +69,15 @@ void onSwitchChangedPacketReceived(const asbPacket &canPacket)
     // Check if packet is like expected
     if (canPacket.len == 2 && (canPacket.data[1] == 0x00 || canPacket.data[1] == 0x01))
     {
-        pulseLedWithVibrationFeedback(200, 1, false);
-
         internalButtonEnabledState = (canPacket.data[1] == 0x01);
-        Serial.print("onSwitchChangedPacketReceived(): Switch was switched to ");
+        Serial.print(F("onSwitchChangedPacketReceived(): The switch was switched to "));
         Serial.println(internalButtonEnabledState);
+
+        pulseLedWithVibrationFeedback(200, 1, false);
     }
     else
     {
-        Serial.println("onSwitchChangedPacketReceived(): Invalid packet!");
+        Serial.println(F("onSwitchChangedPacketReceived(): Invalid packet!"));
     }
 }
 
@@ -151,28 +151,25 @@ void loop()
 
     if (oldButtonState != newButtonState && newButtonState == HIGH)
     {
+        internalButtonEnabledState = !internalButtonEnabledState;
+
+        Serial.print(F("loop(): The switch was switched to "));
+        Serial.println(internalButtonEnabledState);
+
         const unsigned int targetAdress = ASB_BRIDGE_NODE_ID;
         const byte switchPressedPacketData[2] = {ASB_CMD_1B, internalButtonEnabledState ? 0x01 : 0x00};
         const byte switchPressedPacketStats = asb0.asbSend(ASB_PKGTYPE_MULTICAST, targetAdress, sizeof(switchPressedPacketData), switchPressedPacketData);
 
-        Serial.print("loop(): switchPressedPacketStats = ");
-        Serial.println(switchPressedPacketStats);
-
-        Serial.print("loop(): CAN_OK = ");
-        Serial.println(CAN_OK);
-
-        if (switchPressedPacketStats != CAN_OK)
+        if (switchPressedPacketStats != 0)
         {
-            Serial.println(F("Message could not be sent successfully!"));
+            Serial.println(F("loop(): The CAN message could not be sent successfully!"));
             pulseLedWithVibrationFeedback(100, 3, true);
         }
         else
         {
-            Serial.println(F("Message send OK!"));
+            Serial.println(F("loop(): The CAN message was sent successfully."));
             pulseLedWithVibrationFeedback(200, 1, true);
         }
-
-        internalButtonEnabledState = !internalButtonEnabledState;
     }
 
     oldButtonState = newButtonState;
