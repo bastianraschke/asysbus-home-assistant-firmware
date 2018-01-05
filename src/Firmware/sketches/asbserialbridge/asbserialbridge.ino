@@ -17,7 +17,7 @@ void setup()
     Serial.begin(115200);
 
     const char buffer[64];
-    sprintf(buffer, "The node '0x%04X' was powered up.", ASB_NODE_ID);
+    sprintf(buffer, "setup(): The node '0x%04X' was powered up.", ASB_NODE_ID);
     Serial.println(buffer);
 
     setupCanBus();
@@ -26,33 +26,33 @@ void setup()
 
 void setupCanBus()
 {
-    Serial.println(F("Attaching CAN..."));
+    Serial.println(F("setupCanBus(): Attaching CAN..."));
 
     const char busId = asb0.busAttach(&asbCan0);
 
     if (busId != -1)
     {
-        Serial.println(F("Attaching CAN was successful."));
+        Serial.println(F("setupCanBus(): Attaching CAN was successful."));
     }
     else
     {
-        Serial.println(F("Attaching CAN was not successful!"));
+        Serial.println(F("setupCanBus(): Attaching CAN failed!"));
     }
 }
 
 void setupUart()
 {
-    Serial.println(F("Attaching UART..."));
+    Serial.println(F("setupUart(): Attaching UART..."));
 
     const char busId = asb0.busAttach(&asbUart0);
 
     if (busId != -1)
     {
-        Serial.println(F("Attaching UART was successful."));
+        Serial.println(F("setupUart(): Attaching UART was successful."));
     }
     else
     {
-        Serial.println(F("Attaching UART was not successful!"));
+        Serial.println(F("setupUart(): Attaching UART failed!"));
     }
 }
 

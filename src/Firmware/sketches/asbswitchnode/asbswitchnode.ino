@@ -1,5 +1,8 @@
 #include "asb.h"
 
+#define DEBUG                                   1
+#define DEBUG_CANSNIFFER                        0
+
 #define FIRMWARE_VERSION                        "1.0.0"
 
 #define ASB_BRIDGE_NODE_ID                      0x0001
@@ -55,12 +58,12 @@ void setupCanBus()
         }
         else
         {
-            Serial.println(F("setupCanBus(): Attaching switch state changed was not successful!"));
+            Serial.println(F("setupCanBus(): Attaching switch state changed failed!"));
         }
     }
     else
     {
-        Serial.println(F("setupCanBus(): Attaching CAN was not successful!"));
+        Serial.println(F("setupCanBus(): Attaching CAN failed!"));
     }
 }
 
@@ -70,8 +73,11 @@ void onSwitchChangedPacketReceived(const asbPacket &canPacket)
     if (canPacket.len == 2 && (canPacket.data[1] == 0x00 || canPacket.data[1] == 0x01))
     {
         internalButtonEnabledState = (canPacket.data[1] == 0x01);
-        Serial.print(F("onSwitchChangedPacketReceived(): The switch was switched to "));
-        Serial.println(internalButtonEnabledState);
+
+        #if DEBUG == 1
+            Serial.print(F("onSwitchChangedPacketReceived(): The switch was switched to "));
+            Serial.println(internalButtonEnabledState);
+        #endif
 
         pulseLedWithVibrationFeedback(200, 1, false);
     }
@@ -145,7 +151,34 @@ void pulseLedWithVibrationFeedback(const int delayTimeInMilliseconds, const int 
 
 void loop()
 {
-    asb0.loop();
+    #if DEBUG_CANSNIFFER == 1
+        const asbPacket canPacket = asb0.loop();
+
+        if (canPacket.meta.busId != -1)
+        {
+            Serial.println(F("---"));
+            Serial.print(F("Type: 0x"));
+            Serial.println(canPacket.meta.type, HEX);
+            Serial.print(F("Target: 0x"));
+            Serial.println(canPacket.meta.target, HEX);
+            Serial.print(F("Source: 0x"));
+            Serial.println(canPacket.meta.source, HEX);
+            Serial.print(F("Port: 0x"));
+            Serial.println(canPacket.meta.port, HEX);
+            Serial.print(F("Length: 0x"));
+            Serial.println(canPacket.len, HEX);
+
+            for (byte i = 0; i < canPacket.len; i++)
+            {
+                Serial.print(F(" 0x"));
+                Serial.print(canPacket.data[i], HEX);
+            }
+
+            Serial.println();
+        }
+    #else
+        asb0.loop();
+    #endif
 
     const bool newButtonState = digitalRead(PIN_BUTTON);
 
@@ -153,8 +186,10 @@ void loop()
     {
         internalButtonEnabledState = !internalButtonEnabledState;
 
-        Serial.print(F("loop(): The switch was switched to "));
-        Serial.println(internalButtonEnabledState);
+        #if DEBUG == 1
+            Serial.print(F("loop(): The switch was switched to "));
+            Serial.println(internalButtonEnabledState);
+        #endif
 
         const unsigned int targetAdress = ASB_BRIDGE_NODE_ID;
         const byte switchPressedPacketData[2] = {ASB_CMD_1B, internalButtonEnabledState ? 0x01 : 0x00};
