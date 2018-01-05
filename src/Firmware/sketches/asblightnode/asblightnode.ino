@@ -1,5 +1,8 @@
 #include "asb.h"
 
+#define DEBUG                                   1
+#define DEBUG_CANSNIFFER                        0
+
 #define FIRMWARE_VERSION                        "1.0.0"
 
 #define ASB_BRIDGE_NODE_ID                      0x0001
@@ -14,6 +17,13 @@
 #define PIN_LED_GREEN                           3
 #define PIN_LED_BLUE                            6
 #define PIN_LED_WHITE                           9
+
+/**
+ * Define some offsets for color channels in the range 0..255:
+ */
+#define LED_RED_OFFSET                          -20
+#define LED_GREEN_OFFSET                        0
+#define LED_BLUE_OFFSET                         0
 
 ASB asb0(ASB_NODE_ID);
 ASB_CAN asbCan0(PIN_CAN_CS, CAN_125KBPS, MCP_8MHz, PIN_CAN_INT);
@@ -56,8 +66,8 @@ void setupCanBus()
         Serial.println(F("Attaching light state changed hook..."));
 
         const uint8_t hookOnPacketType = ASB_PKGTYPE_MULTICAST;
-        const uint8_t hookOnTarget = ASB_NODE_ID;
-        const uint8_t hookOnPort = -1;
+        const unsigned int hookOnTarget = ASB_NODE_ID;
+        const uint8_t hookOnPort = 0xFF;
         const uint8_t hookOnFirstDataByte = ASB_CMD_S_LIGHT;
 
         if (asb0.hookAttach(hookOnPacketType, hookOnTarget, hookOnPort, hookOnFirstDataByte, onLightChangedPacketReceived))
@@ -77,25 +87,15 @@ void setupCanBus()
 
 void onLightChangedPacketReceived(const asbPacket &canPacket)
 {
-    // Check if packet is like expected
-    if (canPacket.len == 6)
-    {
-        const bool stateOnOff = canPacket.data[0];
-        const uint8_t brightness = constrain(canPacket.data[1], 0, 255);
+    const bool stateOnOff = canPacket.data[1];
+    const uint8_t brightness = constrain(canPacket.data[2], 0, 255);
 
-        const uint8_t redValue = constrain(canPacket.data[2], 0, 255);
-        const uint8_t greenValue = constrain(canPacket.data[3], 0, 255);
-        const uint8_t blueValue = constrain(canPacket.data[4], 0, 255);
-        const uint8_t whiteValue = constrain(canPacket.data[5], 0, 255);
+    const uint8_t redValue = constrain(canPacket.data[3], 0, 255);
+    const uint8_t greenValue = constrain(canPacket.data[4], 0, 255);
+    const uint8_t blueValue = constrain(canPacket.data[5], 0, 255);
+    const uint8_t whiteValue = constrain(canPacket.data[6], 0, 255);
 
-        const uint8_t mappedRedValue = map(redValue, 0, 255, 0, brightness);
-        const uint8_t mappedGreenValue = map(greenValue, 0, 255, 0, brightness);
-        const uint8_t mappedBlueValue = map(blueValue, 0, 255, 0, brightness);
-        const uint8_t mappedWhiteValue = map(whiteValue, 0, 255, 0, brightness);
-
-        // TODO: Pass other variables too?
-        showGivenColor(mappedRedValue, mappedGreenValue, mappedBlueValue, mappedWhiteValue);
-
+    #if DEBUG == 1
         Serial.print(F("onLightChangedPacketReceived(): The light was changed to "));
 
         Serial.print(F("onLightChangedPacketReceived(): stateOnOff = "));
@@ -112,15 +112,41 @@ void onLightChangedPacketReceived(const asbPacket &canPacket)
         Serial.println(blueValue);
         Serial.print(F("onLightChangedPacketReceived(): whiteValue = "));
         Serial.println(whiteValue);
+    #endif
+
+    const uint8_t redValueWithOffset = constrain(redValue + LED_RED_OFFSET, 0, 255);
+    const uint8_t greenValueWithOffset = constrain(greenValue + LED_GREEN_OFFSET, 0, 255);
+    const uint8_t blueValueWithOffset = constrain(blueValue + LED_BLUE_OFFSET, 0, 255);
+
+    const uint8_t redValueWithBrightness = map(redValueWithOffset, 0, 255, 0, brightness);
+    const uint8_t greenValueWithBrightness = map(greenValueWithOffset, 0, 255, 0, brightness);
+    const uint8_t blueValueWithBrightness = map(blueValueWithOffset, 0, 255, 0, brightness);
+    const uint8_t whiteValueWithBrightness = map(whiteValue, 0, 255, 0, brightness);
+
+    // TODO: Pass other variables too to have logic there?
+    if (stateOnOff == true)
+    {
+        showGivenColor(redValueWithBrightness, greenValueWithBrightness, blueValueWithBrightness, whiteValueWithBrightness);
     }
     else
     {
-        Serial.println(F("onLightChangedPacketReceived(): Invalid packet!"));
+        showGivenColor(0, 0, 0, 0);
     }
 }
 
 void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
 {
+    #if DEBUG == 1
+        Serial.print(F("showGivenColor(): redValue = "));
+        Serial.println(redValue);
+        Serial.print(F("showGivenColor(): greenValue = "));
+        Serial.println(greenValue);
+        Serial.print(F("showGivenColor(): blueValue = "));
+        Serial.println(blueValue);
+        Serial.print(F("showGivenColor(): whiteValue = "));
+        Serial.println(whiteValue);
+    #endif
+
     analogWrite(PIN_LED_RED, redValue);
     analogWrite(PIN_LED_GREEN, greenValue);
     analogWrite(PIN_LED_BLUE, blueValue);
@@ -137,28 +163,30 @@ void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint
 
 void loop()
 {
-    //asb0.loop();
+    #if DEBUG_CANSNIFFER == 1
+        const asbPacket canPacket = asb0.loop();
 
-    const asbPacket canPacket = asb0.loop();
+        if (canPacket.meta.busId != -1) {
+            Serial.println(F("---"));
+            Serial.print(F("Type: 0x"));
+            Serial.println(canPacket.meta.type, HEX);
+            Serial.print(F("Target: 0x"));
+            Serial.println(canPacket.meta.target, HEX);
+            Serial.print(F("Source: 0x"));
+            Serial.println(canPacket.meta.source, HEX);
+            Serial.print(F("Port: 0x"));
+            Serial.println(canPacket.meta.port, HEX);
+            Serial.print(F("Length: 0x"));
+            Serial.println(canPacket.len, HEX);
 
-    if (canPacket.meta.busId != -1) {
-        Serial.println(F("---"));
-        Serial.print(F("Type: 0x"));
-        Serial.println(canPacket.meta.type, HEX);
-        Serial.print(F("Target: 0x"));
-        Serial.println(canPacket.meta.target, HEX);
-        Serial.print(F("Source: 0x"));
-        Serial.println(canPacket.meta.source, HEX);
-        Serial.print(F("Port: 0x"));
-        Serial.println(canPacket.meta.port, HEX);
-        Serial.print(F("Length: 0x"));
-        Serial.println(canPacket.len, HEX);
+            for(byte i=0; i<canPacket.len; i++) {
+                Serial.print(F(" 0x"));
+                Serial.print(canPacket.data[i], HEX);
+            }
 
-        for(byte i=0; i<canPacket.len; i++) {
-            Serial.print(F(" 0x"));
-            Serial.print(canPacket.data[i], HEX);
+            Serial.println();
         }
-
-        Serial.println();
-    }
+    #else
+        asb0.loop();
+    #endif
 }
