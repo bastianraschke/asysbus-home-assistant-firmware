@@ -45,25 +45,31 @@ void setupCanBus()
     {
         Serial.println(F("setupCanBus(): Attaching CAN was successful."));
 
-        Serial.println(F("setupCanBus(): Attaching switch state changed hook..."));
-
-        const uint8_t hookOnPacketType = ASB_PKGTYPE_MULTICAST;
-        const unsigned int hookOnTarget = ASB_NODE_ID;
-        const uint8_t hookOnPort = 0xFF;
-        const uint8_t hookOnFirstDataByte = ASB_CMD_1B;
-
-        if (asb0.hookAttach(hookOnPacketType, hookOnTarget, hookOnPort, hookOnFirstDataByte, onSwitchChangedPacketReceived))
-        {
-            Serial.println(F("setupCanBus(): Attaching switch state changed was successful."));
-        }
-        else
-        {
-            Serial.println(F("setupCanBus(): Attaching switch state changed failed!"));
-        }
+        setupCanBusSwitchChangedPacketReceived();
+        setupCanBusRequestStatePacketReceived();
     }
     else
     {
         Serial.println(F("setupCanBus(): Attaching CAN failed!"));
+    }
+}
+
+void setupCanBusSwitchChangedPacketReceived()
+{
+    Serial.println(F("setupCanBusSwitchChangedPacketReceived(): Attaching switch state changed hook..."));
+
+    const uint8_t hookOnPacketType = ASB_PKGTYPE_MULTICAST;
+    const unsigned int hookOnTarget = ASB_NODE_ID;
+    const uint8_t hookOnPort = 0xFF;
+    const uint8_t hookOnFirstDataByte = ASB_CMD_1B;
+
+    if (asb0.hookAttach(hookOnPacketType, hookOnTarget, hookOnPort, hookOnFirstDataByte, onSwitchChangedPacketReceived))
+    {
+        Serial.println(F("setupCanBusSwitchChangedPacketReceived(): Attaching switch state changed was successful."));
+    }
+    else
+    {
+        Serial.println(F("setupCanBusSwitchChangedPacketReceived(): Attaching switch state changed failed!"));
     }
 }
 
@@ -85,6 +91,40 @@ void onSwitchChangedPacketReceived(const asbPacket &canPacket)
     {
         Serial.println(F("onSwitchChangedPacketReceived(): Invalid packet!"));
     }
+}
+
+void setupCanBusRequestStatePacketReceived()
+{
+    Serial.println(F("setupCanBusRequestStatePacketReceived(): Attaching request state hook..."));
+
+    const uint8_t hookOnPacketType = ASB_PKGTYPE_MULTICAST;
+    const unsigned int hookOnTarget = ASB_NODE_ID;
+    const uint8_t hookOnPort = 0xFF;
+    const uint8_t hookOnFirstDataByte = ASB_CMD_REQ;
+
+    if (asb0.hookAttach(hookOnPacketType, hookOnTarget, hookOnPort, hookOnFirstDataByte, onRequestStatePacketReceived))
+    {
+        Serial.println(F("setupCanBusRequestStatePacketReceived(): Attaching request state was successful."));
+    }
+    else
+    {
+        Serial.println(F("setupCanBusRequestStatePacketReceived(): Attaching request state failed!"));
+    }
+}
+
+void onRequestStatePacketReceived(const asbPacket &canPacket)
+{
+    // Send current state if it was requested
+    sendCurrentStatePacket();
+}
+
+bool sendCurrentStatePacket()
+{
+    const unsigned int targetAdress = ASB_BRIDGE_NODE_ID;
+    const byte switchStatePacketData[2] = {ASB_CMD_1B, internalButtonEnabledState ? 0x01 : 0x00};
+    const byte switchStatePacketStats = asb0.asbSend(ASB_PKGTYPE_MULTICAST, targetAdress, sizeof(switchStatePacketData), switchStatePacketData);
+
+    return (switchStatePacketStats == 0);
 }
 
 void setupLed()
@@ -191,19 +231,17 @@ void loop()
             Serial.println(internalButtonEnabledState);
         #endif
 
-        const unsigned int targetAdress = ASB_BRIDGE_NODE_ID;
-        const byte switchPressedPacketData[2] = {ASB_CMD_1B, internalButtonEnabledState ? 0x01 : 0x00};
-        const byte switchPressedPacketStats = asb0.asbSend(ASB_PKGTYPE_MULTICAST, targetAdress, sizeof(switchPressedPacketData), switchPressedPacketData);
+        const bool statePacketSentSuccessfully = sendCurrentStatePacket();
 
-        if (switchPressedPacketStats != 0)
-        {
-            Serial.println(F("loop(): The CAN message could not be sent successfully!"));
-            pulseLedWithVibrationFeedback(100, 3, true);
-        }
-        else
+        if (statePacketSentSuccessfully)
         {
             Serial.println(F("loop(): The CAN message was sent successfully."));
             pulseLedWithVibrationFeedback(200, 1, true);
+        }
+        else
+        {
+            Serial.println(F("loop(): The CAN message could not be sent successfully!"));
+            pulseLedWithVibrationFeedback(100, 3, true);
         }
     }
 
