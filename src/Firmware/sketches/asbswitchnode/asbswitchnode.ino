@@ -30,8 +30,8 @@ void setup()
     Serial.println(buffer);
 
     setupCanBus();
-    setupLed();
     setupVibrationMotor();
+    setupLed();
     setupButton();
 }
 
@@ -127,14 +127,17 @@ bool sendCurrentStatePacket()
     return (switchStatePacketStats == 0);
 }
 
-void setupLed()
-{
-    pinMode(PIN_LED, OUTPUT);
-}
-
 void setupVibrationMotor()
 {
     pinMode(PIN_VIBRATION_MOTOR, OUTPUT);
+}
+
+void setupLed()
+{
+    pinMode(PIN_LED, OUTPUT);
+
+    // Test LED
+    pulseLedWithVibrationFeedback(200, 2, false);
 }
 
 void setupButton()
@@ -148,6 +151,7 @@ void pulseLedWithVibrationFeedback(const int delayTimeInMilliseconds, const int 
     // Avoid devision by zero
     if (delayTimeInMilliseconds > 0)
     {
+        // The delay time is divided by 2 phases (fade in and fade out) and 256 steps
         const int stepDelayTimeInMicroseconds = (int) (((float) delayTimeInMilliseconds * 1000.0f) / 2.0f / 256.0f);
 
         for (int t = 0; t < repeatCount; t++)
