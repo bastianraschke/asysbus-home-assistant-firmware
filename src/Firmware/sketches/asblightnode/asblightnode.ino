@@ -17,6 +17,7 @@
 #define LED_RED_OFFSET                          -20
 #define LED_GREEN_OFFSET                        0
 #define LED_BLUE_OFFSET                         0
+#define LED_WHITE_OFFSET                        0
 
 #define PIN_CAN_CS                              10
 #define PIN_CAN_INT                             2
@@ -71,25 +72,31 @@ void setupCanBus()
     {
         Serial.println(F("setupCanBus(): Attaching CAN was successful."));
 
-        Serial.println(F("setupCanBus(): Attaching light state changed hook..."));
-
-        const uint8_t hookOnPacketType = ASB_PKGTYPE_MULTICAST;
-        const unsigned int hookOnTarget = ASB_NODE_ID;
-        const uint8_t hookOnPort = 0xFF;
-        const uint8_t hookOnFirstDataByte = ASB_CMD_S_LIGHT;
-
-        if (asb0.hookAttach(hookOnPacketType, hookOnTarget, hookOnPort, hookOnFirstDataByte, onLightChangedPacketReceived))
-        {
-            Serial.println(F("setupCanBus(): Attaching light state changed was successful."));
-        }
-        else
-        {
-            Serial.println(F("setupCanBus(): Attaching light state changed failed!"));
-        }
+        setupCanBusLightChangedPacketReceived();
+        setupCanBusRequestStatePacketReceived();
     }
     else
     {
         Serial.println(F("setupCanBus(): Attaching CAN failed!"));
+    }
+}
+
+void setupCanBusLightChangedPacketReceived()
+{
+    Serial.println(F("setupCanBusLightChangedPacketReceived(): Attaching light state changed hook..."));
+
+    const uint8_t hookOnPacketType = ASB_PKGTYPE_MULTICAST;
+    const unsigned int hookOnTarget = ASB_NODE_ID;
+    const uint8_t hookOnPort = 0xFF;
+    const uint8_t hookOnFirstDataByte = ASB_CMD_S_LIGHT;
+
+    if (asb0.hookAttach(hookOnPacketType, hookOnTarget, hookOnPort, hookOnFirstDataByte, onLightChangedPacketReceived))
+    {
+        Serial.println(F("setupCanBusLightChangedPacketReceived(): Attaching light state changed was successful."));
+    }
+    else
+    {
+        Serial.println(F("setupCanBusLightChangedPacketReceived(): Attaching light state changed failed!"));
     }
 }
 
@@ -125,11 +132,12 @@ void onLightChangedPacketReceived(const asbPacket &canPacket)
     const uint8_t redValueWithOffset = constrain(redValue + LED_RED_OFFSET, 0, 255);
     const uint8_t greenValueWithOffset = constrain(greenValue + LED_GREEN_OFFSET, 0, 255);
     const uint8_t blueValueWithOffset = constrain(blueValue + LED_BLUE_OFFSET, 0, 255);
+    const uint8_t whiteValueWithOffset = constrain(whiteValue + LED_WHITE_OFFSET, 0, 255);
 
     const uint8_t redValueWithBrightness = map(redValueWithOffset, 0, 255, 0, brightness);
     const uint8_t greenValueWithBrightness = map(greenValueWithOffset, 0, 255, 0, brightness);
     const uint8_t blueValueWithBrightness = map(blueValueWithOffset, 0, 255, 0, brightness);
-    const uint8_t whiteValueWithBrightness = map(whiteValue, 0, 255, 0, brightness);
+    const uint8_t whiteValueWithBrightness = map(whiteValueWithOffset, 0, 255, 0, brightness);
 
     // TODO: Pass other variables too to have logic there?
     if (stateOnOff == true)
@@ -169,6 +177,36 @@ void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint
     {
         analogWrite(PIN_LED_WHITE, 0);   
     }
+}
+
+void setupCanBusRequestStatePacketReceived()
+{
+    Serial.println(F("setupCanBusRequestStatePacketReceived(): Attaching request state hook..."));
+
+    const uint8_t hookOnPacketType = ASB_PKGTYPE_MULTICAST;
+    const unsigned int hookOnTarget = ASB_NODE_ID;
+    const uint8_t hookOnPort = 0xFF;
+    const uint8_t hookOnFirstDataByte = ASB_CMD_REQ;
+
+    if (asb0.hookAttach(hookOnPacketType, hookOnTarget, hookOnPort, hookOnFirstDataByte, onRequestStatePacketReceived))
+    {
+        Serial.println(F("setupCanBusRequestStatePacketReceived(): Attaching request state was successful."));
+    }
+    else
+    {
+        Serial.println(F("setupCanBusRequestStatePacketReceived(): Attaching request state failed!"));
+    }
+}
+
+void onRequestStatePacketReceived(const asbPacket &canPacket)
+{
+    // Send current state if it was requested
+    sendCurrentStatePacket();
+}
+
+bool sendCurrentStatePacket()
+{
+
 }
 
 void loop()
