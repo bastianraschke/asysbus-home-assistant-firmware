@@ -14,7 +14,7 @@
  * Define some optional offsets for color channels in the range 0..255
  * to trim some possible color inconsistency of the LED strip:
  */
-#define LED_RED_OFFSET                          -20
+#define LED_RED_OFFSET                          0
 #define LED_GREEN_OFFSET                        0
 #define LED_BLUE_OFFSET                         0
 #define LED_WHITE_OFFSET                        0
@@ -29,6 +29,16 @@
 
 ASB asb0(ASB_NODE_ID);
 ASB_CAN asbCan0(PIN_CAN_CS, CAN_125KBPS, MCP_8MHz, PIN_CAN_INT);
+
+int currentRedValue = 0;
+int currentGreenValue = 0; 
+int currentBlueValue = 0;
+int currentWhiteValue = 0;
+
+int previousRedValue = currentRedValue;
+int previousGreenValue = currentGreenValue;
+int previousBlueValue = currentBlueValue;
+int previousWhiteValue = currentWhiteValue;
 
 enum LEDType {
     RGB,
@@ -111,7 +121,7 @@ void onLightChangedPacketReceived(const asbPacket &canPacket)
     const uint8_t whiteValue = constrain(canPacket.data[6], 0, 255);
 
     #if DEBUG == 1
-        Serial.print(F("onLightChangedPacketReceived(): The light was changed to:"));
+        Serial.println(F("onLightChangedPacketReceived(): The light was changed to:"));
 
         Serial.print(F("onLightChangedPacketReceived(): stateOnOff = "));
         Serial.println(stateOnOff);
@@ -139,7 +149,6 @@ void onLightChangedPacketReceived(const asbPacket &canPacket)
     const uint8_t blueValueWithBrightness = map(blueValueWithOffset, 0, 255, 0, brightness);
     const uint8_t whiteValueWithBrightness = map(whiteValueWithOffset, 0, 255, 0, brightness);
 
-    // TODO: Pass other variables too to have logic there?
     if (stateOnOff == true)
     {
         showGivenColor(redValueWithBrightness, greenValueWithBrightness, blueValueWithBrightness, whiteValueWithBrightness);
@@ -150,8 +159,15 @@ void onLightChangedPacketReceived(const asbPacket &canPacket)
     }
 }
 
-void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
+void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, uint8_t whiteValue)
 {
+    const bool fading = true;
+
+    if (LED_TYPE != RGBW)
+    {
+        whiteValue = 0;
+    }
+
     #if DEBUG == 1
         Serial.print(F("showGivenColor(): redValue = "));
         Serial.println(redValue);
@@ -163,20 +179,115 @@ void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint
         Serial.println(whiteValue);
     #endif
 
-    // TODO: Add fade (optional?) effect
+    if (fading)
+    {
+        showGivenColorWithFadeEffect(redValue, greenValue, blueValue, whiteValue);
+    }
+    else
+    {
+        showGivenColorImmediately(redValue, greenValue, blueValue, whiteValue);
+    }
+}
+
+// TODO: move
+#define CROSSFADE_DELAY                         2
+#define CROSSFADE_STEPCOUNT                     255
+
+void showGivenColorWithFadeEffect(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
+{
+    // Calulate step count between old and new color value for each color part
+    const int stepCountRed = calculateStepsBetweenColorValues(previousRedValue, redValue);
+    const int stepCountGreen = calculateStepsBetweenColorValues(previousGreenValue, greenValue); 
+    const int stepCountBlue = calculateStepsBetweenColorValues(previousBlueValue, blueValue);
+    const int stepCountWhite = calculateStepsBetweenColorValues(previousWhiteValue, whiteValue);
+
+    Serial.print(F("showGivenColorWithFadeEffect(): previousRedValue = "));
+    Serial.println(previousRedValue);
+    Serial.print(F("showGivenColorWithFadeEffect(): previousGreenValue = "));
+    Serial.println(previousGreenValue);
+    Serial.print(F("showGivenColorWithFadeEffect(): previousBlueValue = "));
+    Serial.println(previousBlueValue);
+    Serial.print(F("showGivenColorWithFadeEffect(): previousWhiteValue = "));
+    Serial.println(previousWhiteValue);
+
+    Serial.print(F("showGivenColorWithFadeEffect(): stepCountRed = "));
+    Serial.println(stepCountRed);
+    Serial.print(F("showGivenColorWithFadeEffect(): stepCountGreen = "));
+    Serial.println(stepCountGreen);
+    Serial.print(F("showGivenColorWithFadeEffect(): stepCountBlue = "));
+    Serial.println(stepCountBlue);
+    Serial.print(F("showGivenColorWithFadeEffect(): stepCountWhite = "));
+    Serial.println(stepCountWhite);
+
+    for (int i = 0; i <= CROSSFADE_STEPCOUNT; i++)
+    {
+        currentRedValue = calculateSteppedColorValue(stepCountRed, currentRedValue, i);
+        currentGreenValue = calculateSteppedColorValue(stepCountGreen, currentGreenValue, i);
+        currentBlueValue = calculateSteppedColorValue(stepCountBlue, currentBlueValue, i);
+        currentWhiteValue = calculateSteppedColorValue(stepCountWhite, currentWhiteValue, i);
+
+        showGivenColorImmediately(currentRedValue, currentGreenValue, currentBlueValue, currentWhiteValue);
+        delay(CROSSFADE_DELAY);
+    }
+
+    previousRedValue = currentRedValue; 
+    previousGreenValue = currentGreenValue; 
+    previousBlueValue = currentBlueValue;
+    previousWhiteValue = currentWhiteValue;
+}
+
+// TODO: smaller types
+int calculateStepsBetweenColorValues(const int oldColorValue, const int newColorValue)
+{
+    int colorValueDifference = newColorValue - oldColorValue;
+
+    if (colorValueDifference > 0)
+    {
+        colorValueDifference = CROSSFADE_STEPCOUNT / colorValueDifference;
+    }
+
+    return colorValueDifference;
+}
+
+// TODO: smaller types
+int calculateSteppedColorValue(const int stepCount, const int currentColorValue, const int i) {
+
+    int steppedColorValue = currentColorValue;
+
+    if (stepCount && (i % stepCount) == 0)
+    {
+        if (stepCount > 0)
+        {              
+            steppedColorValue += 1;           
+        } 
+        else if (stepCount < 0)
+        {
+            steppedColorValue -= 1;
+        } 
+    }
+
+    steppedColorValue = constrain(steppedColorValue, 0, 255);
+    return steppedColorValue;
+}
+
+void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
+{
+
+    Serial.print(F("showGivenColorImmediately(): redValue = "));
+    Serial.print(redValue);
+    Serial.print(F(", greenValue = "));
+    Serial.print(greenValue);
+    Serial.print(F(", blueValue = "));
+    Serial.print(blueValue);
+    Serial.print(F(", whiteValue = "));
+    Serial.print(whiteValue);
+    Serial.println();
+
 
     analogWrite(PIN_LED_RED, redValue);
     analogWrite(PIN_LED_GREEN, greenValue);
     analogWrite(PIN_LED_BLUE, blueValue);
-
-    if (LED_TYPE == RGBW)
-    {
-        analogWrite(PIN_LED_WHITE, whiteValue); 
-    }
-    else
-    {
-        analogWrite(PIN_LED_WHITE, 0);   
-    }
+    analogWrite(PIN_LED_WHITE, whiteValue);
 }
 
 void setupCanBusRequestStatePacketReceived()
@@ -206,7 +317,7 @@ void onRequestStatePacketReceived(const asbPacket &canPacket)
 
 bool sendCurrentStatePacket()
 {
-
+    // TODO: Send data
 }
 
 void loop()
