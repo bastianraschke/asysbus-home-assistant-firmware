@@ -254,12 +254,15 @@ int calculateSteppedColorValue(const int stepCount, const int currentColorValue,
 
     int steppedColorValue = currentColorValue;
 
-    if (stepCount && (i % stepCount) == 0)
+    // If step is non-zero and its time to change a value,
+    if (stepCount > 0 && (i % stepCount) == 0)
     {
+        // increment the value if step is positive
         if (stepCount > 0)
         {              
             steppedColorValue += 1;           
-        } 
+        }
+        // or decrement it if step is negative
         else if (stepCount < 0)
         {
             steppedColorValue -= 1;
@@ -272,7 +275,6 @@ int calculateSteppedColorValue(const int stepCount, const int currentColorValue,
 
 void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
 {
-
     Serial.print(F("showGivenColorImmediately(): redValue = "));
     Serial.print(redValue);
     Serial.print(F(", greenValue = "));
@@ -282,7 +284,6 @@ void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue,
     Serial.print(F(", whiteValue = "));
     Serial.print(whiteValue);
     Serial.println();
-
 
     analogWrite(PIN_LED_RED, redValue);
     analogWrite(PIN_LED_GREEN, greenValue);
