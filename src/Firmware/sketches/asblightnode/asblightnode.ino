@@ -19,6 +19,10 @@
 #define LED_BLUE_OFFSET                         0
 #define LED_WHITE_OFFSET                        0
 
+// TODO: Use millis here:
+#define CROSSFADE_DELAY                         2
+#define CROSSFADE_STEPCOUNT                     256
+
 #define PIN_CAN_CS                              10
 #define PIN_CAN_INT                             2
 
@@ -30,15 +34,15 @@
 ASB asb0(ASB_NODE_ID);
 ASB_CAN asbCan0(PIN_CAN_CS, CAN_125KBPS, MCP_8MHz, PIN_CAN_INT);
 
-int currentRedValue = 0;
-int currentGreenValue = 0; 
-int currentBlueValue = 0;
-int currentWhiteValue = 0;
+uint8_t currentRedValue = 0;
+uint8_t currentGreenValue = 0; 
+uint8_t currentBlueValue = 50;
+uint8_t currentWhiteValue = 0;
 
-int previousRedValue = currentRedValue;
-int previousGreenValue = currentGreenValue;
-int previousBlueValue = currentBlueValue;
-int previousWhiteValue = currentWhiteValue;
+uint8_t previousRedValue = currentRedValue;
+uint8_t previousGreenValue = currentGreenValue;
+uint8_t previousBlueValue = currentBlueValue;
+uint8_t previousWhiteValue = currentWhiteValue;
 
 enum LEDType {
     RGB,
@@ -53,8 +57,11 @@ void setup()
     sprintf(buffer, "setup(): The node '0x%04X' was powered up.", ASB_NODE_ID);
     Serial.println(buffer);
 
-    setupLEDs();
-    setupCanBus();
+    // setupLEDs();
+    // setupCanBus();
+
+    showGivenColorWithFadeEffect(200, 100, 0, 0);
+    showGivenColorWithFadeEffect(0,   100, 0, 0);
 }
 
 void setupLEDs()
@@ -170,13 +177,14 @@ void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint
 
     #if DEBUG == 1
         Serial.print(F("showGivenColor(): redValue = "));
-        Serial.println(redValue);
-        Serial.print(F("showGivenColor(): greenValue = "));
-        Serial.println(greenValue);
-        Serial.print(F("showGivenColor(): blueValue = "));
-        Serial.println(blueValue);
-        Serial.print(F("showGivenColor(): whiteValue = "));
-        Serial.println(whiteValue);
+        Serial.print(redValue);
+        Serial.print(F(", greenValue = "));
+        Serial.print(greenValue);
+        Serial.print(F(", blueValue = "));
+        Serial.print(blueValue);
+        Serial.print(F(", whiteValue = "));
+        Serial.print(whiteValue);
+        Serial.println();
     #endif
 
     if (fading)
@@ -189,45 +197,46 @@ void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint
     }
 }
 
-// TODO: move
-#define CROSSFADE_DELAY                         2
-#define CROSSFADE_STEPCOUNT                     255
-
 void showGivenColorWithFadeEffect(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
 {
-    // Calulate step count between old and new color value for each color part
-    const int stepCountRed = calculateStepsBetweenColorValues(previousRedValue, redValue);
-    const int stepCountGreen = calculateStepsBetweenColorValues(previousGreenValue, greenValue); 
-    const int stepCountBlue = calculateStepsBetweenColorValues(previousBlueValue, blueValue);
-    const int stepCountWhite = calculateStepsBetweenColorValues(previousWhiteValue, whiteValue);
+    const float valueChangePerStepRed = calculateValueChangePerStep(previousRedValue, redValue);
+    const float valueChangePerStepGreen = calculateValueChangePerStep(previousGreenValue, greenValue);
+    const float valueChangePerStepBlue = calculateValueChangePerStep(previousBlueValue, blueValue);
+    const float valueChangePerStepWhite = calculateValueChangePerStep(previousWhiteValue, whiteValue);
 
-    Serial.print(F("showGivenColorWithFadeEffect(): previousRedValue = "));
-    Serial.println(previousRedValue);
-    Serial.print(F("showGivenColorWithFadeEffect(): previousGreenValue = "));
-    Serial.println(previousGreenValue);
-    Serial.print(F("showGivenColorWithFadeEffect(): previousBlueValue = "));
-    Serial.println(previousBlueValue);
-    Serial.print(F("showGivenColorWithFadeEffect(): previousWhiteValue = "));
-    Serial.println(previousWhiteValue);
+    #if DEBUG == 1
+        Serial.print("showGivenColorWithFadeEffect(): valueChangePerStepRed = ");
+        Serial.print(valueChangePerStepRed);
+        Serial.print(", valueChangePerStepGreen = ");
+        Serial.print(valueChangePerStepGreen);
+        Serial.print(", valueChangePerStepBlue = ");
+        Serial.print(valueChangePerStepBlue);
+        Serial.print(", valueChangePerStepWhite = ");
+        Serial.print(valueChangePerStepWhite);
+        Serial.println();
+    #endif
 
-    Serial.print(F("showGivenColorWithFadeEffect(): stepCountRed = "));
-    Serial.println(stepCountRed);
-    Serial.print(F("showGivenColorWithFadeEffect(): stepCountGreen = "));
-    Serial.println(stepCountGreen);
-    Serial.print(F("showGivenColorWithFadeEffect(): stepCountBlue = "));
-    Serial.println(stepCountBlue);
-    Serial.print(F("showGivenColorWithFadeEffect(): stepCountWhite = "));
-    Serial.println(stepCountWhite);
+    float tempRedValue = currentRedValue;
+    float tempGreenValue = currentGreenValue; 
+    float tempBlueValue = currentBlueValue;
+    float tempWhiteValue = currentWhiteValue;
 
-    for (int i = 0; i <= CROSSFADE_STEPCOUNT; i++)
+    for (int i = 0; i < CROSSFADE_STEPCOUNT; i++)
     {
-        currentRedValue = calculateSteppedColorValue(stepCountRed, currentRedValue, i);
-        currentGreenValue = calculateSteppedColorValue(stepCountGreen, currentGreenValue, i);
-        currentBlueValue = calculateSteppedColorValue(stepCountBlue, currentBlueValue, i);
-        currentWhiteValue = calculateSteppedColorValue(stepCountWhite, currentWhiteValue, i);
+        tempRedValue = tempRedValue + valueChangePerStepRed;
+        tempGreenValue = tempGreenValue + valueChangePerStepGreen;
+        tempBlueValue = tempBlueValue + valueChangePerStepBlue;
+        tempWhiteValue = tempWhiteValue + valueChangePerStepWhite;
+
+        currentRedValue = round(tempRedValue);
+        currentGreenValue = round(tempGreenValue);
+        currentBlueValue = round(tempBlueValue);
+        currentWhiteValue = round(tempWhiteValue);
 
         showGivenColorImmediately(currentRedValue, currentGreenValue, currentBlueValue, currentWhiteValue);
-        delay(CROSSFADE_DELAY);
+
+        // TODO: change millis to micros
+        // delay(CROSSFADE_DELAY);
     }
 
     previousRedValue = currentRedValue; 
@@ -236,54 +245,25 @@ void showGivenColorWithFadeEffect(const uint8_t redValue, const uint8_t greenVal
     previousWhiteValue = currentWhiteValue;
 }
 
-// TODO: smaller types
-int calculateStepsBetweenColorValues(const int oldColorValue, const int newColorValue)
+float calculateValueChangePerStep(const uint8_t startValue, const uint8_t endValue)
 {
-    int colorValueDifference = newColorValue - oldColorValue;
-
-    if (colorValueDifference > 0)
-    {
-        colorValueDifference = CROSSFADE_STEPCOUNT / colorValueDifference;
-    }
-
-    return colorValueDifference;
-}
-
-// TODO: smaller types
-int calculateSteppedColorValue(const int stepCount, const int currentColorValue, const int i) {
-
-    int steppedColorValue = currentColorValue;
-
-    // If step is non-zero and its time to change a value,
-    if (stepCount > 0 && (i % stepCount) == 0)
-    {
-        // increment the value if step is positive
-        if (stepCount > 0)
-        {              
-            steppedColorValue += 1;           
-        }
-        // or decrement it if step is negative
-        else if (stepCount < 0)
-        {
-            steppedColorValue -= 1;
-        } 
-    }
-
-    steppedColorValue = constrain(steppedColorValue, 0, 255);
-    return steppedColorValue;
+    const float valueChangePerStep = ((float) (endValue - startValue)) / ((float) CROSSFADE_STEPCOUNT);
+    return valueChangePerStep;
 }
 
 void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
 {
-    Serial.print(F("showGivenColorImmediately(): redValue = "));
-    Serial.print(redValue);
-    Serial.print(F(", greenValue = "));
-    Serial.print(greenValue);
-    Serial.print(F(", blueValue = "));
-    Serial.print(blueValue);
-    Serial.print(F(", whiteValue = "));
-    Serial.print(whiteValue);
-    Serial.println();
+    #if DEBUG == 1
+        Serial.print(F("showGivenColorImmediately(): redValue = "));
+        Serial.print(redValue);
+        Serial.print(F(", greenValue = "));
+        Serial.print(greenValue);
+        Serial.print(F(", blueValue = "));
+        Serial.print(blueValue);
+        Serial.print(F(", whiteValue = "));
+        Serial.print(whiteValue);
+        Serial.println();
+    #endif
 
     analogWrite(PIN_LED_RED, redValue);
     analogWrite(PIN_LED_GREEN, greenValue);
@@ -323,32 +303,32 @@ bool sendCurrentStatePacket()
 
 void loop()
 {
-    #if DEBUG_CANSNIFFER == 1
-        const asbPacket canPacket = asb0.loop();
+    // #if DEBUG_CANSNIFFER == 1
+    //     const asbPacket canPacket = asb0.loop();
 
-        if (canPacket.meta.busId != -1)
-        {
-            Serial.println(F("---"));
-            Serial.print(F("Type: 0x"));
-            Serial.println(canPacket.meta.type, HEX);
-            Serial.print(F("Target: 0x"));
-            Serial.println(canPacket.meta.target, HEX);
-            Serial.print(F("Source: 0x"));
-            Serial.println(canPacket.meta.source, HEX);
-            Serial.print(F("Port: 0x"));
-            Serial.println(canPacket.meta.port, HEX);
-            Serial.print(F("Length: 0x"));
-            Serial.println(canPacket.len, HEX);
+    //     if (canPacket.meta.busId != -1)
+    //     {
+    //         Serial.println(F("---"));
+    //         Serial.print(F("Type: 0x"));
+    //         Serial.println(canPacket.meta.type, HEX);
+    //         Serial.print(F("Target: 0x"));
+    //         Serial.println(canPacket.meta.target, HEX);
+    //         Serial.print(F("Source: 0x"));
+    //         Serial.println(canPacket.meta.source, HEX);
+    //         Serial.print(F("Port: 0x"));
+    //         Serial.println(canPacket.meta.port, HEX);
+    //         Serial.print(F("Length: 0x"));
+    //         Serial.println(canPacket.len, HEX);
 
-            for (byte i = 0; i < canPacket.len; i++)
-            {
-                Serial.print(F(" 0x"));
-                Serial.print(canPacket.data[i], HEX);
-            }
+    //         for (byte i = 0; i < canPacket.len; i++)
+    //         {
+    //             Serial.print(F(" 0x"));
+    //             Serial.print(canPacket.data[i], HEX);
+    //         }
 
-            Serial.println();
-        }
-    #else
-        asb0.loop();
-    #endif
+    //         Serial.println();
+    //     }
+    // #else
+    //     asb0.loop();
+    // #endif
 }
