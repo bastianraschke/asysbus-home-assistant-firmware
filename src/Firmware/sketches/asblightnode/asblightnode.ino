@@ -41,26 +41,10 @@ uint8_t brightness = 0;
  * These color values are the original state values:
  */
 
-uint8_t originalRedValue;
-uint8_t originalGreenValue;
-uint8_t originalBlueValue;
-uint8_t originalWhiteValue;
-
-// For RGBW LED type show only the native white LEDs
-if (LED_TYPE == RGBW)
-{
-    originalRedValue = 0;
-    originalGreenValue = 0;
-    originalBlueValue = 0;
-    originalWhiteValue = 255;
-}
-else
-{
-    originalRedValue = 255;
-    originalGreenValue = 255;
-    originalBlueValue = 255;
-    originalWhiteValue = 0;
-}
+uint8_t originalRedValue = 0;
+uint8_t originalGreenValue = 0;
+uint8_t originalBlueValue = 0;
+uint8_t originalWhiteValue = 0;
 
 /*
  * These color values include offset and brightness:
@@ -96,6 +80,22 @@ void setup()
 void setupLEDs()
 {
     Serial.println("setupLEDs(): Setup LEDs...");
+
+    // For RGBW LED type show only the native white LEDs
+    if (LED_TYPE == RGBW)
+    {
+        originalRedValue = 0;
+        originalGreenValue = 0;
+        originalBlueValue = 0;
+        originalWhiteValue = 255;
+    }
+    else
+    {
+        originalRedValue = 255;
+        originalGreenValue = 255;
+        originalBlueValue = 255;
+        originalWhiteValue = 0;
+    }
 
     // For the startup, ne transition is needed
     const bool transitionEffect = false;
@@ -336,7 +336,19 @@ void onRequestStatePacketReceived(const asbPacket &canPacket)
 
 bool sendCurrentStatePacket()
 {
-    // TODO: Send data
+    const unsigned int targetAdress = ASB_BRIDGE_NODE_ID;
+    const byte lightStatePacketData[7] = {
+        ASB_CMD_S_LIGHT,
+        stateOnOff,
+        brightness,
+        originalRedValue,
+        originalGreenValue,
+        originalBlueValue,
+        originalWhiteValue
+    };
+
+    const byte lightStatePacketStats = asb0.asbSend(ASB_PKGTYPE_MULTICAST, targetAdress, sizeof(lightStatePacketData), lightStatePacketData);
+    return (lightStatePacketStats == 0);
 }
 
 void loop()
