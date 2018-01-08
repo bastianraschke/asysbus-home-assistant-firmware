@@ -37,7 +37,34 @@ bool stateOnOff = true;
 bool transitionEffect = true;
 uint8_t brightness = 0; 
 
-// TODO: Store state without included bridgeness?
+/*
+ * These color values are the original state values:
+ */
+
+uint8_t originalRedValue;
+uint8_t originalGreenValue;
+uint8_t originalBlueValue;
+uint8_t originalWhiteValue;
+
+// For RGBW LED type show only the native white LEDs
+if (LED_TYPE == RGBW)
+{
+    originalRedValue = 0;
+    originalGreenValue = 0;
+    originalBlueValue = 0;
+    originalWhiteValue = 255;
+}
+else
+{
+    originalRedValue = 255;
+    originalGreenValue = 255;
+    originalBlueValue = 255;
+    originalWhiteValue = 0;
+}
+
+/*
+ * These color values include offset and brightness:
+ */
 
 uint8_t currentRedValue = 0;
 uint8_t currentGreenValue = 0; 
@@ -72,16 +99,7 @@ void setupLEDs()
 
     // For the startup, ne transition is needed
     const bool transitionEffect = false;
-
-    // For RGBW LED type show only the native white LEDs
-    if (LED_TYPE == RGBW)
-    {
-        showGivenColor(0, 0, 0, 255, transitionEffect);
-    }
-    else
-    {
-        showGivenColor(255, 255, 255, 0, transitionEffect);
-    }
+    showGivenColor(originalRedValue, originalGreenValue, originalBlueValue, originalWhiteValue, transitionEffect);
 }
 
 void setupCanBus()
@@ -125,10 +143,10 @@ void setupCanBusLightChangedPacketReceived()
 void onLightChangedPacketReceived(const asbPacket &canPacket)
 {
     stateOnOff = canPacket.data[1];
-    
-    // TODO: From CAN packet
+
+    // TODO: Read from CAN packet:
     transitionEffect = true;
-    
+
     brightness = constrain(canPacket.data[2], 0, 255);
 
     const uint8_t redValue = constrain(canPacket.data[3], 0, 255);
@@ -158,15 +176,32 @@ void onLightChangedPacketReceived(const asbPacket &canPacket)
         Serial.println(whiteValue);
     #endif
 
-    const uint8_t redValueWithOffset = constrain(redValue + LED_RED_OFFSET, 0, 255);
-    const uint8_t greenValueWithOffset = constrain(greenValue + LED_GREEN_OFFSET, 0, 255);
-    const uint8_t blueValueWithOffset = constrain(blueValue + LED_BLUE_OFFSET, 0, 255);
-    const uint8_t whiteValueWithOffset = constrain(whiteValue + LED_WHITE_OFFSET, 0, 255);
+    originalRedValue = redValue;
+    originalGreenValue = greenValue;
+    originalBlueValue = blueValue;
+
+    const uint8_t redValueWithOffset = constrain(originalRedValue + LED_RED_OFFSET, 0, 255);
+    const uint8_t greenValueWithOffset = constrain(originalGreenValue + LED_GREEN_OFFSET, 0, 255);
+    const uint8_t blueValueWithOffset = constrain(originalBlueValue + LED_BLUE_OFFSET, 0, 255);
+    uint8_t whiteValueWithOffset;
 
     const uint8_t redValueWithBrightness = map(redValueWithOffset, 0, 255, 0, brightness);
     const uint8_t greenValueWithBrightness = map(greenValueWithOffset, 0, 255, 0, brightness);
     const uint8_t blueValueWithBrightness = map(blueValueWithOffset, 0, 255, 0, brightness);
-    const uint8_t whiteValueWithBrightness = map(whiteValueWithOffset, 0, 255, 0, brightness);
+    uint8_t whiteValueWithBrightness;
+
+    if (LED_TYPE == RGBW)
+    {
+        originalWhiteValue = whiteValue;
+        whiteValueWithOffset = constrain(originalWhiteValue + LED_WHITE_OFFSET, 0, 255);
+        whiteValueWithBrightness = map(whiteValueWithOffset, 0, 255, 0, brightness);
+    }
+    else
+    {
+        originalWhiteValue = 0;
+        whiteValueWithOffset = 0;
+        whiteValueWithBrightness = 0;
+    }
 
     if (stateOnOff == true)
     {
@@ -180,12 +215,6 @@ void onLightChangedPacketReceived(const asbPacket &canPacket)
 
 void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, uint8_t whiteValue, const bool transitionEffect)
 {
-    // TODO: Move code part
-    if (LED_TYPE != RGBW)
-    {
-        whiteValue = 0;
-    }
-
     #if DEBUG == 1
         Serial.print(F("showGivenColor(): redValue = "));
         Serial.print(redValue);
