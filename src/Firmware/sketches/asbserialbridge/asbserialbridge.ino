@@ -16,7 +16,7 @@ void setup()
 {
     Serial.begin(115200);
 
-    const char buffer[64];
+    char buffer[64] = {0};
     sprintf(buffer, "setup(): The node '0x%04X' was powered up.", ASB_NODE_ID);
     Serial.println(buffer);
 

@@ -25,7 +25,7 @@ void setup()
 {
     Serial.begin(115200);
 
-    const char buffer[64];
+    char buffer[64] = {0};
     sprintf(buffer, "setup(): The node '0x%04X' was powered up.", ASB_NODE_ID);
     Serial.println(buffer);
 
@@ -73,7 +73,7 @@ void setupCanBusSwitchChangedPacketReceived()
     }
 }
 
-void onSwitchChangedPacketReceived(const asbPacket &canPacket)
+void onSwitchChangedPacketReceived(asbPacket &canPacket)
 {
     // Check if packet is like expected
     if (canPacket.len == 2 && (canPacket.data[1] == 0x00 || canPacket.data[1] == 0x01))
@@ -112,7 +112,7 @@ void setupCanBusRequestStatePacketReceived()
     }
 }
 
-void onRequestStatePacketReceived(const asbPacket &canPacket)
+void onRequestStatePacketReceived(asbPacket &canPacket)
 {
     // Send current state if it was requested
     sendCurrentStatePacket();
