@@ -14,12 +14,13 @@
  * Define some optional offsets for color channels in the range 0..255
  * to trim some possible color inconsistency of the LED strip:
  */
-#define LED_RED_OFFSET                          0
+#define LED_RED_OFFSET                          -20
 #define LED_GREEN_OFFSET                        0
 #define LED_BLUE_OFFSET                         0
 #define LED_WHITE_OFFSET                        0
 
-#define CROSSFADE_DELAY_MICROSECONDS            2000
+#define CROSSFADE_ENABLED                       true
+#define CROSSFADE_DELAY_MICROSECONDS            1500
 #define CROSSFADE_STEPCOUNT                     256
 
 #define PIN_CAN_CS                              10
@@ -33,9 +34,9 @@
 ASB asb0(ASB_NODE_ID);
 ASB_CAN asbCan0(PIN_CAN_CS, CAN_125KBPS, MCP_8MHz, PIN_CAN_INT);
 
-bool stateOnOff = true;
-bool transitionEffect = true;
-uint8_t brightness = 0; 
+bool stateOnOff;
+bool transitionEffect;
+uint8_t brightness; 
 
 /*
  * These color values are the original state values:
@@ -52,7 +53,7 @@ uint8_t originalWhiteValue = 0;
 
 uint8_t currentRedValue = 0;
 uint8_t currentGreenValue = 0; 
-uint8_t currentBlueValue = 50;
+uint8_t currentBlueValue = 0;
 uint8_t currentWhiteValue = 0;
 
 uint8_t previousRedValue = currentRedValue;
@@ -69,17 +70,25 @@ void setup()
 {
     Serial.begin(115200);
 
-    const char buffer[64];
+    char buffer[64] = {0};
     sprintf(buffer, "setup(): The node '0x%04X' was powered up.", ASB_NODE_ID);
     Serial.println(buffer);
 
     setupLEDs();
     setupCanBus();
+
+    // After boot, publish current status
+    sendCurrentStatePacket();
 }
 
 void setupLEDs()
 {
     Serial.println("setupLEDs(): Setup LEDs...");
+
+    // Set initial values for LED
+    stateOnOff = true;
+    transitionEffect = true;
+    brightness = 255;
 
     // For RGBW LED type show only the native white LEDs
     if (LED_TYPE == RGBW)
@@ -97,8 +106,18 @@ void setupLEDs()
         originalWhiteValue = 0;
     }
 
-    // For the startup, ne transition is needed
-    const bool transitionEffect = false;
+    #if DEBUG == 1
+        Serial.print("setupLEDs(): originalRedValue = ");
+        Serial.print(originalRedValue);
+        Serial.print(", originalGreenValue = ");
+        Serial.print(originalGreenValue);
+        Serial.print(", originalBlueValue = ");
+        Serial.print(originalBlueValue);
+        Serial.print(", originalWhiteValue = ");
+        Serial.print(originalWhiteValue);
+        Serial.println();
+    #endif
+
     showGivenColor(originalRedValue, originalGreenValue, originalBlueValue, originalWhiteValue, transitionEffect);
 }
 
@@ -140,19 +159,16 @@ void setupCanBusLightChangedPacketReceived()
     }
 }
 
-void onLightChangedPacketReceived(const asbPacket &canPacket)
+void onLightChangedPacketReceived(asbPacket &canPacket)
 {
     stateOnOff = canPacket.data[1];
-
-    // TODO: Read from CAN packet:
-    transitionEffect = true;
-
     brightness = constrain(canPacket.data[2], 0, 255);
+    transitionEffect = canPacket.data[3];
 
-    const uint8_t redValue = constrain(canPacket.data[3], 0, 255);
-    const uint8_t greenValue = constrain(canPacket.data[4], 0, 255);
-    const uint8_t blueValue = constrain(canPacket.data[5], 0, 255);
-    const uint8_t whiteValue = constrain(canPacket.data[6], 0, 255);
+    const uint8_t redValue = constrain(canPacket.data[4], 0, 255);
+    const uint8_t greenValue = constrain(canPacket.data[5], 0, 255);
+    const uint8_t blueValue = constrain(canPacket.data[6], 0, 255);
+    const uint8_t whiteValue = constrain(canPacket.data[7], 0, 255);
 
     #if DEBUG == 1
         Serial.println(F("onLightChangedPacketReceived(): The light was changed to:"));
@@ -213,7 +229,7 @@ void onLightChangedPacketReceived(const asbPacket &canPacket)
     }
 }
 
-void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, uint8_t whiteValue, const bool transitionEffect)
+void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const bool transitionEffect)
 {
     #if DEBUG == 1
         Serial.print(F("showGivenColor(): redValue = "));
@@ -227,7 +243,7 @@ void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint
         Serial.println();
     #endif
 
-    if (transitionEffect)
+    if (CROSSFADE_ENABLED && transitionEffect)
     {
         showGivenColorWithTransition(redValue, greenValue, blueValue, whiteValue);
     }
@@ -328,7 +344,7 @@ void setupCanBusRequestStatePacketReceived()
     }
 }
 
-void onRequestStatePacketReceived(const asbPacket &canPacket)
+void onRequestStatePacketReceived(asbPacket &canPacket)
 {
     // Send current state if it was requested
     sendCurrentStatePacket();
@@ -337,10 +353,11 @@ void onRequestStatePacketReceived(const asbPacket &canPacket)
 bool sendCurrentStatePacket()
 {
     const unsigned int targetAdress = ASB_BRIDGE_NODE_ID;
-    const byte lightStatePacketData[7] = {
+    byte lightStatePacketData[8] = {
         ASB_CMD_S_LIGHT,
         stateOnOff,
         brightness,
+        transitionEffect,
         originalRedValue,
         originalGreenValue,
         originalBlueValue,
