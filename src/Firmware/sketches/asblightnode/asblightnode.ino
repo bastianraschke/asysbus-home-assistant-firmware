@@ -162,13 +162,13 @@ void setupCanBusLightChangedPacketReceived()
 void onLightChangedPacketReceived(asbPacket &canPacket)
 {
     stateOnOff = canPacket.data[1];
-    brightness = constrain(canPacket.data[2], 0, 255);
+    brightness = constrainBetweenByte(canPacket.data[2]);
     transitionEffect = canPacket.data[3];
 
-    const uint8_t redValue = constrain(canPacket.data[4], 0, 255);
-    const uint8_t greenValue = constrain(canPacket.data[5], 0, 255);
-    const uint8_t blueValue = constrain(canPacket.data[6], 0, 255);
-    const uint8_t whiteValue = constrain(canPacket.data[7], 0, 255);
+    const uint8_t redValue = constrainBetweenByte(canPacket.data[4]);
+    const uint8_t greenValue = constrainBetweenByte(canPacket.data[5]);
+    const uint8_t blueValue = constrainBetweenByte(canPacket.data[6]);
+    const uint8_t whiteValue = constrainBetweenByte(canPacket.data[7]);
 
     #if DEBUG >= 1
         Serial.print(F("onLightChangedPacketReceived(): The light was changed to: "));
@@ -192,29 +192,17 @@ void onLightChangedPacketReceived(asbPacket &canPacket)
     originalRedValue = redValue;
     originalGreenValue = greenValue;
     originalBlueValue = blueValue;
+    originalWhiteValue = (LED_TYPE == RGBW) ? whiteValue : 0;
 
-    const uint8_t redValueWithOffset = constrain(originalRedValue + LED_RED_OFFSET, 0, 255);
-    const uint8_t greenValueWithOffset = constrain(originalGreenValue + LED_GREEN_OFFSET, 0, 255);
-    const uint8_t blueValueWithOffset = constrain(originalBlueValue + LED_BLUE_OFFSET, 0, 255);
-    uint8_t whiteValueWithOffset;
+    const uint8_t redValueWithOffset = constrainBetweenByte(originalRedValue + LED_RED_OFFSET);
+    const uint8_t greenValueWithOffset = constrainBetweenByte(originalGreenValue + LED_GREEN_OFFSET);
+    const uint8_t blueValueWithOffset = constrainBetweenByte(originalBlueValue + LED_BLUE_OFFSET);
+    const uint8_t whiteValueWithOffset = (LED_TYPE == RGBW) ? constrainBetweenByte(originalWhiteValue + LED_WHITE_OFFSET) : 0;
 
-    const uint8_t redValueWithBrightness = map(redValueWithOffset, 0, 255, 0, brightness);
-    const uint8_t greenValueWithBrightness = map(greenValueWithOffset, 0, 255, 0, brightness);
-    const uint8_t blueValueWithBrightness = map(blueValueWithOffset, 0, 255, 0, brightness);
-    uint8_t whiteValueWithBrightness;
-
-    if (LED_TYPE == RGBW)
-    {
-        originalWhiteValue = whiteValue;
-        whiteValueWithOffset = constrain(originalWhiteValue + LED_WHITE_OFFSET, 0, 255);
-        whiteValueWithBrightness = map(whiteValueWithOffset, 0, 255, 0, brightness);
-    }
-    else
-    {
-        originalWhiteValue = 0;
-        whiteValueWithOffset = 0;
-        whiteValueWithBrightness = 0;
-    }
+    const uint8_t redValueWithBrightness = mapColorValueWithBrightness(redValueWithOffset, brightness);
+    const uint8_t greenValueWithBrightness = mapColorValueWithBrightness(greenValueWithOffset, brightness);
+    const uint8_t blueValueWithBrightness = mapColorValueWithBrightness(blueValueWithOffset, brightness);
+    const uint8_t whiteValueWithBrightness = (LED_TYPE == RGBW) ? mapColorValueWithBrightness(whiteValueWithOffset, brightness) : 0;
 
     if (stateOnOff == true)
     {
@@ -224,6 +212,16 @@ void onLightChangedPacketReceived(asbPacket &canPacket)
     {
         showGivenColor(0, 0, 0, 0, transitionEffect);
     }
+}
+
+uint8_t constrainBetweenByte(const uint8_t valueToConstrain)
+{
+    return constrain(valueToConstrain, 0, 255);
+}
+
+uint8_t mapColorValueWithBrightness(const uint8_t colorValue, const uint8_t brigthnessValue)
+{
+    return map(colorValue, 0, 255, 0, brigthnessValue);
 }
 
 void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const bool transitionEffect)
@@ -269,11 +267,13 @@ void showGivenColorWithTransition(const uint8_t redValue, const uint8_t greenVal
         Serial.println();
     #endif
 
+    // Start temporary color variable with current color value
     float tempRedValue = currentRedValue;
     float tempGreenValue = currentGreenValue; 
     float tempBlueValue = currentBlueValue;
     float tempWhiteValue = currentWhiteValue;
 
+    // For N steps, add the step value to the temporary color variable to have new current color value 
     for (int i = 0; i < CROSSFADE_STEPCOUNT; i++)
     {
         tempRedValue = tempRedValue + valueChangePerStepRed;
@@ -298,8 +298,7 @@ void showGivenColorWithTransition(const uint8_t redValue, const uint8_t greenVal
 
 float calculateValueChangePerStep(const uint8_t startValue, const uint8_t endValue)
 {
-    const float valueChangePerStep = ((float) (endValue - startValue)) / ((float) CROSSFADE_STEPCOUNT);
-    return valueChangePerStep;
+    return ((float) (endValue - startValue)) / ((float) CROSSFADE_STEPCOUNT);
 }
 
 void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
@@ -320,6 +319,8 @@ void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue,
     analogWrite(PIN_LED_GREEN, greenValue);
     analogWrite(PIN_LED_BLUE, blueValue);
     analogWrite(PIN_LED_WHITE, whiteValue);
+
+    // TODO: previous values are not set here
 }
 
 void setupCanBusRequestStatePacketReceived()
@@ -343,7 +344,6 @@ void setupCanBusRequestStatePacketReceived()
 
 void onRequestStatePacketReceived(asbPacket &canPacket)
 {
-    // Send current state if it was requested
     sendCurrentStatePacket();
 }
 
