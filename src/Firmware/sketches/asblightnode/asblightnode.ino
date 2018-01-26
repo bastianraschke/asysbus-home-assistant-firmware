@@ -63,11 +63,6 @@ uint8_t currentGreenValue = 0;
 uint8_t currentBlueValue = 0;
 uint8_t currentWhiteValue = 0;
 
-uint8_t previousRedValue = currentRedValue;
-uint8_t previousGreenValue = currentGreenValue;
-uint8_t previousBlueValue = currentBlueValue;
-uint8_t previousWhiteValue = currentWhiteValue;
-
 /*
  * Setup
  */
@@ -250,10 +245,11 @@ void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint
 
 void showGivenColorWithTransition(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
 {
-    const float valueChangePerStepRed = calculateValueChangePerStep(previousRedValue, redValue);
-    const float valueChangePerStepGreen = calculateValueChangePerStep(previousGreenValue, greenValue);
-    const float valueChangePerStepBlue = calculateValueChangePerStep(previousBlueValue, blueValue);
-    const float valueChangePerStepWhite = calculateValueChangePerStep(previousWhiteValue, whiteValue);
+    // Calculate step value to get from current shown color to new color
+    const float valueChangePerStepRed = calculateValueChangePerStep(currentRedValue, redValue);
+    const float valueChangePerStepGreen = calculateValueChangePerStep(currentGreenValue, greenValue);
+    const float valueChangePerStepBlue = calculateValueChangePerStep(currentBlueValue, blueValue);
+    const float valueChangePerStepWhite = calculateValueChangePerStep(currentWhiteValue, whiteValue);
 
     #if DEBUG >= 2
         Serial.print(F("showGivenColorWithTransition(): valueChangePerStepRed = "));
@@ -281,19 +277,15 @@ void showGivenColorWithTransition(const uint8_t redValue, const uint8_t greenVal
         tempBlueValue = tempBlueValue + valueChangePerStepBlue;
         tempWhiteValue = tempWhiteValue + valueChangePerStepWhite;
 
-        currentRedValue = round(tempRedValue);
-        currentGreenValue = round(tempGreenValue);
-        currentBlueValue = round(tempBlueValue);
-        currentWhiteValue = round(tempWhiteValue);
+        showGivenColorImmediately(
+            round(tempRedValue),
+            round(tempGreenValue),
+            round(tempBlueValue),
+            round(tempWhiteValue)
+        );
 
-        showGivenColorImmediately(currentRedValue, currentGreenValue, currentBlueValue, currentWhiteValue);
         delayMicroseconds(CROSSFADE_DELAY_MICROSECONDS);
     }
-
-    previousRedValue = currentRedValue; 
-    previousGreenValue = currentGreenValue; 
-    previousBlueValue = currentBlueValue;
-    previousWhiteValue = currentWhiteValue;
 }
 
 void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
@@ -310,12 +302,15 @@ void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue,
         Serial.println();
     #endif
 
-    analogWrite(PIN_LED_RED, redValue);
-    analogWrite(PIN_LED_GREEN, greenValue);
-    analogWrite(PIN_LED_BLUE, blueValue);
-    analogWrite(PIN_LED_WHITE, whiteValue);
+    currentRedValue = redValue;
+    currentGreenValue = greenValue;
+    currentBlueValue = blueValue;
+    currentWhiteValue = whiteValue;
 
-    // TODO: previous values are not set here
+    analogWrite(PIN_LED_RED, currentRedValue);
+    analogWrite(PIN_LED_GREEN, currentGreenValue);
+    analogWrite(PIN_LED_BLUE, currentBlueValue);
+    analogWrite(PIN_LED_WHITE, currentWhiteValue);
 }
 
 uint8_t constrainBetweenByte(const uint8_t valueToConstrain)
