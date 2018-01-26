@@ -9,8 +9,8 @@ enum LEDType {
  * Configuration
  */
 
-#define DEBUG                                   1
-#define DEBUG_CANSNIFFER                        0
+#define DEBUG_LEVEL                             1
+#define DEBUG_CANSNIFFER_ENABLED                0
 
 #define FIRMWARE_VERSION                        "1.0.0"
 
@@ -107,7 +107,7 @@ void setupLEDs()
         originalWhiteValue = 0;
     }
 
-    #if DEBUG >= 2
+    #if DEBUG_LEVEL >= 2
         Serial.print(F("setupLEDs(): originalRedValue = "));
         Serial.print(originalRedValue);
         Serial.print(F(", originalGreenValue = "));
@@ -175,7 +175,7 @@ void onLightChangedPacketReceived(asbPacket &canPacket)
     const uint8_t blueValue = constrainBetweenByte(canPacket.data[6]);
     const uint8_t whiteValue = constrainBetweenByte(canPacket.data[7]);
 
-    #if DEBUG >= 1
+    #if DEBUG_LEVEL >= 1
         Serial.print(F("onLightChangedPacketReceived(): The light was changed to: "));
         Serial.print(F("stateOnOff = "));
         Serial.print(stateOnOff);
@@ -221,7 +221,7 @@ void onLightChangedPacketReceived(asbPacket &canPacket)
 
 void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const bool transitionEffectEnabled)
 {
-    #if DEBUG >= 2
+    #if DEBUG_LEVEL >= 2
         Serial.print(F("showGivenColor(): redValue = "));
         Serial.print(redValue);
         Serial.print(F(", greenValue = "));
@@ -251,7 +251,7 @@ void showGivenColorWithTransition(const uint8_t redValue, const uint8_t greenVal
     const float valueChangePerStepBlue = calculateValueChangePerStep(currentBlueValue, blueValue);
     const float valueChangePerStepWhite = calculateValueChangePerStep(currentWhiteValue, whiteValue);
 
-    #if DEBUG >= 2
+    #if DEBUG_LEVEL >= 2
         Serial.print(F("showGivenColorWithTransition(): valueChangePerStepRed = "));
         Serial.print(valueChangePerStepRed);
         Serial.print(F(", valueChangePerStepGreen = "));
@@ -290,7 +290,7 @@ void showGivenColorWithTransition(const uint8_t redValue, const uint8_t greenVal
 
 void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
 {
-    #if DEBUG >= 2
+    #if DEBUG_LEVEL >= 2
         Serial.print(F("showGivenColorImmediately(): redValue = "));
         Serial.print(redValue);
         Serial.print(F(", greenValue = "));
@@ -380,7 +380,7 @@ bool sendCurrentStatePacket()
 
 void loop()
 {
-    #if DEBUG_CANSNIFFER == 1
+    #if DEBUG_CANSNIFFER_ENABLED == 1
         const asbPacket canPacket = asb0.loop();
 
         if (canPacket.meta.busId != -1)

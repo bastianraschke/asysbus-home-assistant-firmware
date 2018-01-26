@@ -4,8 +4,8 @@
  * Configuration
  */
 
-#define DEBUG                                   1
-#define DEBUG_CANSNIFFER                        0
+#define DEBUG_LEVEL                             1
+#define DEBUG_CANSNIFFER_ENABLED                0
 
 #define FIRMWARE_VERSION                        "1.0.0"
 
@@ -96,7 +96,7 @@ void onSwitchChangedPacketReceived(asbPacket &canPacket)
     {
         internalButtonEnabledState = (canPacket.data[1] == 0x01);
 
-        #if DEBUG == 1
+        #if DEBUG_LEVEL >= 1
             Serial.print(F("onSwitchChangedPacketReceived(): The switch was switched to "));
             Serial.println(internalButtonEnabledState);
         #endif
@@ -140,7 +140,7 @@ void onRequestStatePacketReceived(asbPacket &canPacket)
 bool sendCurrentStatePacket()
 {
     const unsigned int targetAdress = ASB_BRIDGE_NODE_ID;
-    const byte switchStatePacketData[2] = {ASB_CMD_1B, internalButtonEnabledState ? 0x01 : 0x00};
+    byte switchStatePacketData[2] = {ASB_CMD_1B, internalButtonEnabledState};
     const byte switchStatePacketStats = asb0.asbSend(ASB_PKGTYPE_MULTICAST, targetAdress, sizeof(switchStatePacketData), switchStatePacketData);
 
     return (switchStatePacketStats == 0);
@@ -170,8 +170,8 @@ void pulseLedWithVibrationFeedback(const int delayTimeInMilliseconds, const int 
     // The delay time is divided by 2 phases (fade in and fade out) and 256 steps
     const int stepDelayTimeInMicroseconds = (int) (((float) delayTimeInMilliseconds * 1000.0f) / 2.0f / 256.0f);
 
-    // The delay between to repeat cycles (1µs == 1000ms)
-    const int repeatDelayTimeInMicroseconds = (int) (((float) delayTimeInMilliseconds * 1000.0f) * 2.0f);
+    // The delay between cycles (1000µs == 1ms)
+    const int repeatDelayTimeInMicroseconds = delayTimeInMilliseconds * 1000;
 
     for (int t = 0; t < repeatCount; t++)
     {
@@ -183,6 +183,10 @@ void pulseLedWithVibrationFeedback(const int delayTimeInMilliseconds, const int 
             digitalWrite(PIN_VIBRATION_MOTOR, HIGH);
         }
 
+        #if DEBUG_LEVEL >= 2
+            Serial.println(F("pulseLedWithVibrationFeedback(): Fade LED in"));
+        #endif
+
         // Fade in the LED
         for (int i = 0; i < 256; i++)
         {
@@ -190,12 +194,21 @@ void pulseLedWithVibrationFeedback(const int delayTimeInMilliseconds, const int 
             delayMicroseconds(stepDelayTimeInMicroseconds);
         }
 
+        #if DEBUG_LEVEL >= 2
+            Serial.println(F("pulseLedWithVibrationFeedback(): Fade LED in done"));
+            Serial.println(F("pulseLedWithVibrationFeedback(): Fade LED out"));
+        #endif
+
         // Fade out the LED
         for (int i = 256; i >= 0; i--)
         {
             analogWrite(PIN_LED, i);
             delayMicroseconds(stepDelayTimeInMicroseconds);
         }
+
+        #if DEBUG_LEVEL >= 2
+            Serial.println(F("pulseLedWithVibrationFeedback(): Fade LED in done"));
+        #endif
 
         if (vibrateMotor)
         {
@@ -205,7 +218,15 @@ void pulseLedWithVibrationFeedback(const int delayTimeInMilliseconds, const int 
         // A delay between cycles is only needed if the cycle is repeated more than once and also not after the last cycle
         if (repeatCount > 1 && t != repeatCount - 1)
         {
+            #if DEBUG_LEVEL >= 2
+                Serial.println(F("pulseLedWithVibrationFeedback(): Wait after one cycle"));
+            #endif
+
             delayMicroseconds(repeatDelayTimeInMicroseconds);
+
+            #if DEBUG_LEVEL >= 2
+                Serial.println(F("pulseLedWithVibrationFeedback(): Wait after one cycle done"));
+            #endif
         }
     }
 }
@@ -216,7 +237,7 @@ void pulseLedWithVibrationFeedback(const int delayTimeInMilliseconds, const int 
 
 void loop()
 {
-    #if DEBUG_CANSNIFFER == 1
+    #if DEBUG_CANSNIFFER_ENABLED == 1
         const asbPacket canPacket = asb0.loop();
 
         if (canPacket.meta.busId != -1)
@@ -251,7 +272,7 @@ void loop()
     {
         internalButtonEnabledState = !internalButtonEnabledState;
 
-        #if DEBUG == 1
+        #if DEBUG_LEVEL >= 1
             Serial.print(F("loop(): internalButtonEnabledState = "));
             Serial.println(internalButtonEnabledState);
         #endif
