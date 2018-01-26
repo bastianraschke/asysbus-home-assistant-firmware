@@ -1,5 +1,14 @@
 #include "asb.h"
 
+enum LEDType {
+    RGB,
+    RGBW
+};
+
+/*
+ * Configuration
+ */
+
 #define DEBUG                                   1
 #define DEBUG_CANSNIFFER                        0
 
@@ -31,26 +40,24 @@
 #define PIN_LED_BLUE                            6
 #define PIN_LED_WHITE                           9
 
+/*
+ * Initialisation
+ */
+
 ASB asb0(ASB_NODE_ID);
 ASB_CAN asbCan0(PIN_CAN_CS, CAN_125KBPS, MCP_8MHz, PIN_CAN_INT);
 
 bool stateOnOff;
-bool transitionEffect;
+bool transitionEffectEnabled;
 uint8_t brightness; 
 
-/*
- * These color values are the original state values:
- */
-
+// These color values are the original state values:
 uint8_t originalRedValue = 0;
 uint8_t originalGreenValue = 0;
 uint8_t originalBlueValue = 0;
 uint8_t originalWhiteValue = 0;
 
-/*
- * These color values include offset and brightness:
- */
-
+// These color values include color offset and brightness:
 uint8_t currentRedValue = 0;
 uint8_t currentGreenValue = 0; 
 uint8_t currentBlueValue = 0;
@@ -61,10 +68,9 @@ uint8_t previousGreenValue = currentGreenValue;
 uint8_t previousBlueValue = currentBlueValue;
 uint8_t previousWhiteValue = currentWhiteValue;
 
-enum LEDType {
-    RGB,
-    RGBW
-};
+/*
+ * Setup
+ */
 
 void setup()
 {
@@ -87,7 +93,7 @@ void setupLEDs()
 
     // Set initial values for LED
     stateOnOff = true;
-    transitionEffect = true;
+    transitionEffectEnabled = true;
     brightness = 255;
 
     // For RGBW LED type show only the native white LEDs
@@ -107,18 +113,18 @@ void setupLEDs()
     }
 
     #if DEBUG >= 2
-        Serial.print("setupLEDs(): originalRedValue = ");
+        Serial.print(F("setupLEDs(): originalRedValue = "));
         Serial.print(originalRedValue);
-        Serial.print(", originalGreenValue = ");
+        Serial.print(F(", originalGreenValue = "));
         Serial.print(originalGreenValue);
-        Serial.print(", originalBlueValue = ");
+        Serial.print(F(", originalBlueValue = "));
         Serial.print(originalBlueValue);
-        Serial.print(", originalWhiteValue = ");
+        Serial.print(F(", originalWhiteValue = "));
         Serial.print(originalWhiteValue);
         Serial.println();
     #endif
 
-    showGivenColor(originalRedValue, originalGreenValue, originalBlueValue, originalWhiteValue, transitionEffect);
+    showGivenColor(originalRedValue, originalGreenValue, originalBlueValue, originalWhiteValue, transitionEffectEnabled);
 }
 
 void setupCanBus()
@@ -139,6 +145,10 @@ void setupCanBus()
         Serial.println(F("setupCanBus(): Attaching CAN failed!"));
     }
 }
+
+/*
+ * Light changed packet handling
+ */
 
 void setupCanBusLightChangedPacketReceived()
 {
@@ -163,7 +173,7 @@ void onLightChangedPacketReceived(asbPacket &canPacket)
 {
     stateOnOff = canPacket.data[1];
     brightness = constrainBetweenByte(canPacket.data[2]);
-    transitionEffect = canPacket.data[3];
+    transitionEffectEnabled = (canPacket.data[3] == 0x01);
 
     const uint8_t redValue = constrainBetweenByte(canPacket.data[4]);
     const uint8_t greenValue = constrainBetweenByte(canPacket.data[5]);
@@ -176,8 +186,8 @@ void onLightChangedPacketReceived(asbPacket &canPacket)
         Serial.print(stateOnOff);
         Serial.print(F(", brightness = "));
         Serial.print(brightness);
-        Serial.print(F(", transitionEffect = "));
-        Serial.print(transitionEffect);
+        Serial.print(F(", transitionEffectEnabled = "));
+        Serial.print(transitionEffectEnabled);
         Serial.print(F(", redValue = "));
         Serial.print(redValue);
         Serial.print(F(", greenValue = "));
@@ -206,25 +216,15 @@ void onLightChangedPacketReceived(asbPacket &canPacket)
 
     if (stateOnOff == true)
     {
-        showGivenColor(redValueWithBrightness, greenValueWithBrightness, blueValueWithBrightness, whiteValueWithBrightness, transitionEffect);
+        showGivenColor(redValueWithBrightness, greenValueWithBrightness, blueValueWithBrightness, whiteValueWithBrightness, transitionEffectEnabled);
     }
     else
     {
-        showGivenColor(0, 0, 0, 0, transitionEffect);
+        showGivenColor(0, 0, 0, 0, transitionEffectEnabled);
     }
 }
 
-uint8_t constrainBetweenByte(const uint8_t valueToConstrain)
-{
-    return constrain(valueToConstrain, 0, 255);
-}
-
-uint8_t mapColorValueWithBrightness(const uint8_t colorValue, const uint8_t brigthnessValue)
-{
-    return map(colorValue, 0, 255, 0, brigthnessValue);
-}
-
-void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const bool transitionEffect)
+void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue, const bool transitionEffectEnabled)
 {
     #if DEBUG >= 2
         Serial.print(F("showGivenColor(): redValue = "));
@@ -238,7 +238,7 @@ void showGivenColor(const uint8_t redValue, const uint8_t greenValue, const uint
         Serial.println();
     #endif
 
-    if (CROSSFADE_ENABLED && transitionEffect)
+    if (CROSSFADE_ENABLED && transitionEffectEnabled)
     {
         showGivenColorWithTransition(redValue, greenValue, blueValue, whiteValue);
     }
@@ -256,13 +256,13 @@ void showGivenColorWithTransition(const uint8_t redValue, const uint8_t greenVal
     const float valueChangePerStepWhite = calculateValueChangePerStep(previousWhiteValue, whiteValue);
 
     #if DEBUG >= 2
-        Serial.print("showGivenColorWithTransition(): valueChangePerStepRed = ");
+        Serial.print(F("showGivenColorWithTransition(): valueChangePerStepRed = "));
         Serial.print(valueChangePerStepRed);
-        Serial.print(", valueChangePerStepGreen = ");
+        Serial.print(F(", valueChangePerStepGreen = "));
         Serial.print(valueChangePerStepGreen);
-        Serial.print(", valueChangePerStepBlue = ");
+        Serial.print(F(", valueChangePerStepBlue = "));
         Serial.print(valueChangePerStepBlue);
-        Serial.print(", valueChangePerStepWhite = ");
+        Serial.print(F(", valueChangePerStepWhite = "));
         Serial.print(valueChangePerStepWhite);
         Serial.println();
     #endif
@@ -296,11 +296,6 @@ void showGivenColorWithTransition(const uint8_t redValue, const uint8_t greenVal
     previousWhiteValue = currentWhiteValue;
 }
 
-float calculateValueChangePerStep(const uint8_t startValue, const uint8_t endValue)
-{
-    return ((float) (endValue - startValue)) / ((float) CROSSFADE_STEPCOUNT);
-}
-
 void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue, const uint8_t blueValue, const uint8_t whiteValue)
 {
     #if DEBUG >= 2
@@ -322,6 +317,25 @@ void showGivenColorImmediately(const uint8_t redValue, const uint8_t greenValue,
 
     // TODO: previous values are not set here
 }
+
+uint8_t constrainBetweenByte(const uint8_t valueToConstrain)
+{
+    return constrain(valueToConstrain, 0, 255);
+}
+
+uint8_t mapColorValueWithBrightness(const uint8_t colorValue, const uint8_t brigthnessValue)
+{
+    return map(colorValue, 0, 255, 0, brigthnessValue);
+}
+
+float calculateValueChangePerStep(const uint8_t startValue, const uint8_t endValue)
+{
+    return ((float) (endValue - startValue)) / ((float) CROSSFADE_STEPCOUNT);
+}
+
+/*
+ * Light state request packet handling
+ */
 
 void setupCanBusRequestStatePacketReceived()
 {
@@ -354,7 +368,7 @@ bool sendCurrentStatePacket()
         ASB_CMD_S_LIGHT,
         stateOnOff,
         brightness,
-        transitionEffect,
+        transitionEffectEnabled,
         originalRedValue,
         originalGreenValue,
         originalBlueValue,
@@ -364,6 +378,10 @@ bool sendCurrentStatePacket()
     const byte lightStatePacketStats = asb0.asbSend(ASB_PKGTYPE_MULTICAST, targetAdress, sizeof(lightStatePacketData), lightStatePacketData);
     return (lightStatePacketStats == 0);
 }
+
+/*
+ * Loop
+ */
 
 void loop()
 {

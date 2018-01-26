@@ -1,5 +1,9 @@
 #include "asb.h"
 
+/*
+ * Configuration
+ */
+
 #define FIRMWARE_VERSION                        "1.0.0"
 
 #define ASB_BRIDGE_NODE_ID                      0x0001
@@ -8,9 +12,17 @@
 #define PIN_CAN_CS                              10
 #define PIN_CAN_INT                             2
 
+/*
+ * Initialisation
+ */
+
 ASB asb0(ASB_NODE_ID);
 ASB_CAN asbCan0(PIN_CAN_CS, CAN_125KBPS, MCP_8MHz, PIN_CAN_INT);
 ASB_UART asbUart0(Serial);
+
+/*
+ * Setup
+ */
 
 void setup()
 {
@@ -55,6 +67,10 @@ void setupUart()
         Serial.println(F("setupUart(): Attaching UART failed!"));
     }
 }
+
+/*
+ * Loop
+ */
 
 void loop()
 {

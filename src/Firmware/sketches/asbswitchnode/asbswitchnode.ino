@@ -1,5 +1,9 @@
 #include "asb.h"
 
+/*
+ * Configuration
+ */
+
 #define DEBUG                                   1
 #define DEBUG_CANSNIFFER                        0
 
@@ -15,11 +19,19 @@
 #define PIN_VIBRATION_MOTOR                     4
 #define PIN_LED                                 5
 
+/*
+ * Initialisation
+ */
+
 ASB asb0(ASB_NODE_ID);
 ASB_CAN asbCan0(PIN_CAN_CS, CAN_125KBPS, MCP_8MHz, PIN_CAN_INT);
 
 int oldButtonState = LOW;
 bool internalButtonEnabledState = false;
+
+/*
+ * Setup
+ */
 
 void setup()
 {
@@ -53,6 +65,10 @@ void setupCanBus()
         Serial.println(F("setupCanBus(): Attaching CAN failed!"));
     }
 }
+
+/*
+ * Switch changed packet handling
+ */
 
 void setupCanBusSwitchChangedPacketReceived()
 {
@@ -93,6 +109,10 @@ void onSwitchChangedPacketReceived(asbPacket &canPacket)
     }
 }
 
+/*
+ * Switch state request packet handling
+ */
+
 void setupCanBusRequestStatePacketReceived()
 {
     Serial.println(F("setupCanBusRequestStatePacketReceived(): Attaching request state hook..."));
@@ -114,7 +134,6 @@ void setupCanBusRequestStatePacketReceived()
 
 void onRequestStatePacketReceived(asbPacket &canPacket)
 {
-    // Send current state if it was requested
     sendCurrentStatePacket();
 }
 
@@ -136,7 +155,7 @@ void setupLed()
 {
     pinMode(PIN_LED, OUTPUT);
 
-    // Test LED
+    // Self test of the LED without vibration
     pulseLedWithVibrationFeedback(200, 2, false);
 }
 
@@ -148,50 +167,52 @@ void setupButton()
 
 void pulseLedWithVibrationFeedback(const int delayTimeInMilliseconds, const int repeatCount, const bool vibrateMotor)
 {
-    // Avoid devision by zero
-    if (delayTimeInMilliseconds > 0)
+    // The delay time is divided by 2 phases (fade in and fade out) and 256 steps
+    const int stepDelayTimeInMicroseconds = (int) (((float) delayTimeInMilliseconds * 1000.0f) / 2.0f / 256.0f);
+
+    // The delay between to repeat cycles (1µs == 1000ms)
+    const int repeatDelayTimeInMicroseconds = (int) (((float) delayTimeInMilliseconds * 1000.0f) * 2.0f);
+
+    for (int t = 0; t < repeatCount; t++)
     {
-        // The delay time is divided by 2 phases (fade in and fade out) and 256 steps
-        const int stepDelayTimeInMicroseconds = (int) (((float) delayTimeInMilliseconds * 1000.0f) / 2.0f / 256.0f);
+        // Be sure, the LED is off before we start
+        digitalWrite(PIN_LED, LOW);
 
-        for (int t = 0; t < repeatCount; t++)
+        if (vibrateMotor)
         {
-            // Be sure, the LED is off before we start
-            digitalWrite(PIN_LED, LOW);
+            digitalWrite(PIN_VIBRATION_MOTOR, HIGH);
+        }
 
-            if (vibrateMotor)
-            {
-                digitalWrite(PIN_VIBRATION_MOTOR, HIGH);
-            }
+        // Fade in the LED
+        for (int i = 0; i < 256; i++)
+        {
+            analogWrite(PIN_LED, i);
+            delayMicroseconds(stepDelayTimeInMicroseconds);
+        }
 
-            // Fade in the LED
-            for (int i = 0; i < 256; i++)
-            {
-                analogWrite(PIN_LED, i);
-                delayMicroseconds(stepDelayTimeInMicroseconds);
-            }
+        // Fade out the LED
+        for (int i = 256; i >= 0; i--)
+        {
+            analogWrite(PIN_LED, i);
+            delayMicroseconds(stepDelayTimeInMicroseconds);
+        }
 
-            // Fade out the LED
-            for (int i = 256; i >= 0; i--)
-            {
-                analogWrite(PIN_LED, i);
-                delayMicroseconds(stepDelayTimeInMicroseconds);
-            }
+        if (vibrateMotor)
+        {
+            digitalWrite(PIN_VIBRATION_MOTOR, LOW);
+        }
 
-            if (vibrateMotor)
-            {
-                digitalWrite(PIN_VIBRATION_MOTOR, LOW);
-            }
-
-            // A delay between cycles is only needed if the cycle is repeated more than once and also not after the last cycle
-            if (repeatCount > 1 && t != repeatCount - 1)
-            {
-                const int repeatDelayTimeInMicroseconds = (int) (((float) delayTimeInMilliseconds * 1000.0f) * 2.0f);
-                delayMicroseconds(repeatDelayTimeInMicroseconds);
-            }
+        // A delay between cycles is only needed if the cycle is repeated more than once and also not after the last cycle
+        if (repeatCount > 1 && t != repeatCount - 1)
+        {
+            delayMicroseconds(repeatDelayTimeInMicroseconds);
         }
     }
 }
+
+/*
+ * Loop
+ */
 
 void loop()
 {
@@ -231,7 +252,7 @@ void loop()
         internalButtonEnabledState = !internalButtonEnabledState;
 
         #if DEBUG == 1
-            Serial.print(F("loop(): The switch was switched to "));
+            Serial.print(F("loop(): internalButtonEnabledState = "));
             Serial.println(internalButtonEnabledState);
         #endif
 
