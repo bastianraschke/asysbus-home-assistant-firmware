@@ -23,7 +23,7 @@ enum LEDType {
  * Define some optional offsets for color channels in the range 0..255
  * to trim some possible color inconsistency of the LED strip:
  */
-#define LED_RED_OFFSET                          -20
+#define LED_RED_OFFSET                          0
 #define LED_GREEN_OFFSET                        0
 #define LED_BLUE_OFFSET                         0
 #define LED_WHITE_OFFSET                        0
