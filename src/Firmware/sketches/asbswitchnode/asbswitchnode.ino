@@ -140,7 +140,7 @@ void onRequestStatePacketReceived(asbPacket &canPacket)
 bool sendCurrentStatePacket()
 {
     const unsigned int targetAdress = ASB_BRIDGE_NODE_ID;
-    byte switchStatePacketData[2] = {ASB_CMD_1B, internalButtonEnabledState};
+    const byte switchStatePacketData[2] = {ASB_CMD_1B, internalButtonEnabledState};
     const byte switchStatePacketStats = asb0.asbSend(ASB_PKGTYPE_MULTICAST, targetAdress, sizeof(switchStatePacketData), switchStatePacketData);
 
     return (switchStatePacketStats == 0);

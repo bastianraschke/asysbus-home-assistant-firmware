@@ -168,12 +168,25 @@ void onLightChangedPacketReceived(asbPacket &canPacket)
 {
     stateOnOff = canPacket.data[1];
     brightness = constrainBetweenByte(canPacket.data[2]);
-    transitionEffectEnabled = (canPacket.data[3] == 0x01);
 
-    const uint8_t redValue = constrainBetweenByte(canPacket.data[4]);
-    const uint8_t greenValue = constrainBetweenByte(canPacket.data[5]);
-    const uint8_t blueValue = constrainBetweenByte(canPacket.data[6]);
-    const uint8_t whiteValue = constrainBetweenByte(canPacket.data[7]);
+    const uint8_t redValue = constrainBetweenByte(canPacket.data[3]);
+    const uint8_t greenValue = constrainBetweenByte(canPacket.data[4]);
+    const uint8_t blueValue = constrainBetweenByte(canPacket.data[5]);
+    const uint8_t whiteValue = constrainBetweenByte(canPacket.data[6]);
+
+    transitionEffectEnabled = (canPacket.data[7] == 0x01);
+
+    /*
+    0bXXXXXXXX
+      |-------- LED type (RGB, RGBW)
+       |------- Transition effect enabled
+        |------ Reserved
+         |----- Reserved
+          |---- Reserved
+           |--- Reserved
+            |-- Reserved
+             |- Reserved
+    */
 
     #if DEBUG_LEVEL >= 1
         Serial.print(F("onLightChangedPacketReceived(): The light was changed to: "));
@@ -181,8 +194,6 @@ void onLightChangedPacketReceived(asbPacket &canPacket)
         Serial.print(stateOnOff);
         Serial.print(F(", brightness = "));
         Serial.print(brightness);
-        Serial.print(F(", transitionEffectEnabled = "));
-        Serial.print(transitionEffectEnabled);
         Serial.print(F(", redValue = "));
         Serial.print(redValue);
         Serial.print(F(", greenValue = "));
@@ -191,6 +202,8 @@ void onLightChangedPacketReceived(asbPacket &canPacket)
         Serial.print(blueValue);
         Serial.print(F(", whiteValue = "));
         Serial.print(whiteValue);
+        Serial.print(F(", transitionEffectEnabled = "));
+        Serial.print(transitionEffectEnabled);
         Serial.println();
     #endif
 
@@ -359,7 +372,7 @@ void onRequestStatePacketReceived(asbPacket &canPacket)
 bool sendCurrentStatePacket()
 {
     const unsigned int targetAdress = ASB_BRIDGE_NODE_ID;
-    byte lightStatePacketData[8] = {
+    const byte lightStatePacketData[8] = {
         ASB_CMD_S_LIGHT,
         stateOnOff,
         brightness,
