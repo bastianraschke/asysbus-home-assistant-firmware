@@ -1,8 +1,8 @@
 [submodule "src/Firmware/libraries/asysbus"]
 	path = src/Firmware/libraries/asysbus
-	url = git@github.com:bastianraschke/asysbus.git
-	branch = master
+	url = https://github.com/bastianraschke/asysbus.git
+	branch = Feature/Improvements-For-Light-Node
 [submodule "src/Firmware/libraries/CAN_BUS_Shield"]
 	path = src/Firmware/libraries/CAN_BUS_Shield
-	url = git@github.com:bastianraschke/CAN_BUS_Shield.git
+	url = https://github.com/bastianraschke/CAN_BUS_Shield.git
 	branch = master
