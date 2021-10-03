@@ -12,7 +12,7 @@ The `asbserialbridge` firmware is intended to act as a gateway between the CAN b
 
 ### Switch node
 
-The `asbswitchnode` firmware is intended to provide a node that is a physical switch for Home Assistant. The switch node must have a network unique node id (for example `0x07D0`) which is need to be set in the sketch as well as in the corresponding Home Assistant switch configuration. The firmware is designed for hardware that provides a vibration motor on port `D4` and a LED on port `D5` for press indication. The button itself is connected to port `D3`. 
+The `asbswitchnode` firmware is intended to provide a node that is a physical switch for Home Assistant. The switch node must have a network unique node id (for example `0x07D0`) which is need to be set in the sketch as well as in the corresponding Home Assistant switch configuration. The firmware is designed for hardware that provides a vibration motor on port `D4` and a LED on port `D5` for press indication. The button itself is connected to port `D3`.
 
 ### RGB(W) light node
 
